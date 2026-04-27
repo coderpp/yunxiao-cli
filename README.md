@@ -118,6 +118,14 @@ node dist/src/index.js mr merge 2813489 12 --yes
 node dist/src/index.js mr approve-and-merge 2813489 12 --yes --merge-type squash --remove-source-branch
 ```
 
+创建发布合并请求、自动评审通过并合并：
+
+```bash
+node dist/src/index.js mr release yunxiao-cli release/1.2.3 master --yes
+```
+
+这个命令会先按仓库名称查询代码库 ID，再用当前 token 对应的用户作为评审人创建合并请求，随后评审通过并合并。合并时固定保留源分支，不会删除源分支。
+
 查询变更文件树：
 
 ```bash
@@ -140,6 +148,7 @@ node dist/src/index.js mr patches 2813489 12
 node dist/src/index.js mr list --output table
 node dist/src/index.js mr list --output json
 node dist/src/index.js mr review 2813489 12 --output table
+node dist/src/index.js mr release yunxiao-cli release/1.2.3 master --yes --output json
 node dist/src/index.js mr patches 2813489 12 --output json
 ```
 
@@ -158,6 +167,7 @@ node dist/src/index.js mr patches 2813489 12 --output json
 
 - `mr merge`
 - `mr approve-and-merge`
+- `mr release`
 
 这是为了避免误合并。
 

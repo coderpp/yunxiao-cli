@@ -41,6 +41,59 @@ export interface ChangeRequestTreeOptions {
   toPatchSetId: string;
 }
 
+export interface ListRepositoriesOptions {
+  page?: number;
+  perPage?: number;
+  orderBy?: "created_at" | "updated_at" | "last_activity_at" | string;
+  sort?: "asc" | "desc" | string;
+  search?: string;
+  archived?: boolean;
+}
+
+export interface RepositorySummary {
+  id: number | string;
+  name?: string;
+  path?: string;
+  nameWithNamespace?: string;
+  pathWithNamespace?: string;
+}
+
+export interface CurrentUser {
+  id: string;
+  name?: string;
+  username?: string;
+  email?: string;
+}
+
+export interface CreateChangeRequestOptions {
+  sourceBranch: string;
+  sourceProjectId: number | string;
+  targetBranch: string;
+  targetProjectId: number | string;
+  title: string;
+  createFrom?: "WEB" | "COMMAND_LINE";
+  description?: string;
+  reviewerUserIds?: string[];
+  triggerAIReviewRun?: boolean;
+  workItemIds?: string;
+}
+
+export interface ReleaseByRepositoryNameOptions {
+  repositoryName: string;
+  sourceBranch: string;
+  targetBranch: string;
+  title?: string;
+  description?: string;
+  mergeType?: MergeChangeRequestOptions["mergeType"];
+}
+
+export interface ReleaseResult {
+  repository: RepositorySummary;
+  changeRequest: unknown;
+  review: unknown;
+  merge: unknown;
+}
+
 export interface ApproveAndMergeOptions extends ReviewChangeRequestOptions, MergeChangeRequestOptions {}
 
 export class YunxiaoApiError extends Error {
@@ -79,6 +132,29 @@ export class YunxiaoClient {
 
   listChangeRequests(options: ListChangeRequestsOptions = {}): Promise<unknown> {
     return this.request("GET", this.changeRequestsPath(), options);
+  }
+
+  getCurrentUser(): Promise<CurrentUser> {
+    return this.request("GET", "/oapi/v1/platform/user") as Promise<CurrentUser>;
+  }
+
+  listRepositories(options: ListRepositoriesOptions = {}): Promise<RepositorySummary[]> {
+    return this.request("GET", this.repositoriesPath(), options) as Promise<RepositorySummary[]>;
+  }
+
+  createChangeRequest(repositoryId: string, options: CreateChangeRequestOptions): Promise<unknown> {
+    return this.request("POST", `${this.repositoryPath(repositoryId)}/changeRequests`, undefined, {
+      createFrom: options.createFrom ?? "COMMAND_LINE",
+      description: options.description,
+      reviewerUserIds: options.reviewerUserIds,
+      sourceBranch: options.sourceBranch,
+      sourceProjectId: normalizeProjectId(options.sourceProjectId),
+      targetBranch: options.targetBranch,
+      targetProjectId: normalizeProjectId(options.targetProjectId),
+      title: options.title,
+      triggerAIReviewRun: options.triggerAIReviewRun ?? false,
+      workItemIds: options.workItemIds
+    });
   }
 
   reviewChangeRequest(
@@ -131,6 +207,49 @@ export class YunxiaoClient {
     return this.request("GET", `${this.repositoryChangeRequestPath(repositoryId, localId)}/diffs/patches`);
   }
 
+  async releaseByRepositoryName(options: ReleaseByRepositoryNameOptions): Promise<ReleaseResult> {
+    const [currentUser, repositories] = await Promise.all([
+      this.getCurrentUser(),
+      this.listRepositories({
+        page: 1,
+        perPage: 20,
+        search: options.repositoryName,
+        archived: false
+      })
+    ]);
+    const repository = findRepositoryByName(repositories, options.repositoryName);
+    if (!repository) {
+      throw new Error(`Repository not found by name: ${options.repositoryName}`);
+    }
+
+    const repositoryId = String(repository.id);
+    const title = options.title ?? `Release ${options.sourceBranch} into ${options.targetBranch}`;
+    const changeRequest = await this.createChangeRequest(repositoryId, {
+      sourceBranch: options.sourceBranch,
+      targetBranch: options.targetBranch,
+      sourceProjectId: repository.id,
+      targetProjectId: repository.id,
+      reviewerUserIds: [currentUser.id],
+      title,
+      description: options.description
+    });
+    const localId = localIdFromChangeRequest(changeRequest);
+    const review = await this.reviewChangeRequest(repositoryId, localId, {
+      reviewComment: "Approved by yunxiao-cli release workflow"
+    });
+    const merge = await this.mergeChangeRequest(repositoryId, localId, {
+      mergeType: options.mergeType,
+      removeSourceBranch: false
+    });
+
+    return {
+      repository,
+      changeRequest,
+      review,
+      merge
+    };
+  }
+
   private changeRequestsPath(): string {
     if (this.edition === "center") {
       return `/oapi/v1/codeup/organizations/${encodePathSegment(this.organizationId ?? "")}/changeRequests`;
@@ -139,13 +258,25 @@ export class YunxiaoClient {
     return "/oapi/v1/codeup/changeRequests";
   }
 
-  private repositoryChangeRequestPath(repositoryId: string, localId: number): string {
-    const encodedRepositoryId = encodePathSegment(repositoryId);
+  private repositoriesPath(): string {
     if (this.edition === "center") {
-      return `/oapi/v1/codeup/organizations/${encodePathSegment(this.organizationId ?? "")}/repositories/${encodedRepositoryId}/changeRequests/${localId}`;
+      return `/oapi/v1/codeup/organizations/${encodePathSegment(this.organizationId ?? "")}/repositories`;
     }
 
-    return `/oapi/v1/codeup/repositories/${encodedRepositoryId}/changeRequests/${localId}`;
+    return "/oapi/v1/codeup/repositories";
+  }
+
+  private repositoryPath(repositoryId: string): string {
+    const encodedRepositoryId = encodePathSegment(repositoryId);
+    if (this.edition === "center") {
+      return `/oapi/v1/codeup/organizations/${encodePathSegment(this.organizationId ?? "")}/repositories/${encodedRepositoryId}`;
+    }
+
+    return `/oapi/v1/codeup/repositories/${encodedRepositoryId}`;
+  }
+
+  private repositoryChangeRequestPath(repositoryId: string, localId: number): string {
+    return `${this.repositoryPath(repositoryId)}/changeRequests/${localId}`;
   }
 
   private async request(
@@ -199,4 +330,39 @@ function compactBody<T extends Record<string, unknown>>(body: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(body).filter(([, value]) => value !== undefined && value !== null && value !== "")
   ) as Partial<T>;
+}
+
+function normalizeProjectId(value: number | string): number | string {
+  const numberValue = typeof value === "string" ? Number(value) : value;
+  return Number.isInteger(numberValue) ? numberValue : value;
+}
+
+function findRepositoryByName(repositories: RepositorySummary[], repositoryName: string): RepositorySummary | undefined {
+  const normalizedName = normalizeRepositoryName(repositoryName);
+  const matches = repositories.filter((repository) =>
+    [repository.name, repository.path, repository.nameWithNamespace, repository.pathWithNamespace]
+      .filter((value): value is string => typeof value === "string")
+      .some((value) => normalizeRepositoryName(value) === normalizedName)
+  );
+
+  if (matches.length > 1) {
+    throw new Error(`Multiple repositories matched name: ${repositoryName}. Use a more specific path.`);
+  }
+
+  return matches[0];
+}
+
+function normalizeRepositoryName(value: string): string {
+  return value.replace(/\s+\/\s+/g, "/").trim().toLowerCase();
+}
+
+function localIdFromChangeRequest(changeRequest: unknown): number {
+  if (typeof changeRequest === "object" && changeRequest !== null && "localId" in changeRequest) {
+    const localId = Number((changeRequest as { localId: unknown }).localId);
+    if (Number.isInteger(localId) && localId > 0) {
+      return localId;
+    }
+  }
+
+  throw new Error("Create change request response did not include a valid localId.");
 }

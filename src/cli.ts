@@ -46,6 +46,20 @@ export async function runCli(args = process.argv.slice(2), env = process.env, io
       throw new Error(`Command mr ${command} requires <repositoryId> and <localId>.`);
     }
 
+    if (command === "release") {
+      requireConfirmation(parsed.flags);
+      result = await client.releaseByRepositoryName({
+        repositoryName: repositoryId,
+        sourceBranch: localIdRaw,
+        targetBranch: requiredPositional(parsed.positionals[4], "targetBranch"),
+        title: optionalString(parsed.flags.title),
+        description: optionalString(parsed.flags.description),
+        mergeType: mergeOptions(parsed.flags).mergeType
+      });
+      printResult(result, outputFormat, stdout);
+      return 0;
+    }
+
     const localId = parseLocalId(localIdRaw);
 
     switch (command) {
@@ -254,6 +268,14 @@ function parseLocalId(value: string): number {
   return localId;
 }
 
+function requiredPositional(value: string | undefined, name: string): string {
+  if (!value) {
+    throw new Error(`Missing required positional argument <${name}>.`);
+  }
+
+  return value;
+}
+
 function requiredFlag(flags: Record<string, string | boolean>, name: string): string {
   const value = optionalString(flags[name]);
   if (!value) {
@@ -296,6 +318,7 @@ Usage:
   yunxiao mr review <repositoryId> <localId> [--comment "LGTM"] [--output table|json]
   yunxiao mr merge <repositoryId> <localId> --yes [--merge-type no-fast-forward] [--output table|json]
   yunxiao mr approve-and-merge <repositoryId> <localId> --yes [--merge-type no-fast-forward] [--output table|json]
+  yunxiao mr release <repositoryName> <sourceBranch> <targetBranch> --yes [--title "Release"] [--output table|json]
   yunxiao mr tree <repositoryId> <localId> --from-patch-set-id <id> --to-patch-set-id <id> [--output table|json]
   yunxiao mr patches <repositoryId> <localId> [--output table|json]
 
