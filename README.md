@@ -53,6 +53,8 @@ yunxiao mr list --state opened
 - Workflow filename：`publish.yml`
 - Environment name：留空
 
+Trusted Publishing 要求发布环境使用 npm CLI 11.5.1 或更高版本，workflow 的发布 job 使用 Node.js 24。
+
 发布新版本的流程：
 
 ```bash
