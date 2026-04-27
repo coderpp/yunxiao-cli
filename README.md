@@ -28,7 +28,7 @@ npx @coderpp/yunxiao-cli mr list --state opened
 也可以指定版本：
 
 ```bash
-npx @coderpp/yunxiao-cli@0.1.0 mr list --json
+npx @coderpp/yunxiao-cli@0.1.4 mr list --output json
 ```
 
 包内的可执行命令名仍然是 `yunxiao`，全局安装后可这样使用：
@@ -97,7 +97,7 @@ node dist/src/index.js mr list --state opened --project-ids 2813489 --per-page 2
 输出 JSON：
 
 ```bash
-node dist/src/index.js mr list --state opened --json
+node dist/src/index.js mr list --state opened --output json
 ```
 
 评审通过指定合并请求：
@@ -131,6 +131,24 @@ node dist/src/index.js mr tree 2813489 12 \
 ```bash
 node dist/src/index.js mr patches 2813489 12
 ```
+
+## 输出格式
+
+所有会输出 API 结果的命令都支持 `--output`：
+
+```bash
+node dist/src/index.js mr list --output table
+node dist/src/index.js mr list --output json
+node dist/src/index.js mr review 2813489 12 --output table
+node dist/src/index.js mr patches 2813489 12 --output json
+```
+
+支持的格式：
+
+- `table`：普通表格文本，默认值。
+- `json`：格式化 JSON。
+
+`--json` 仍然可用，等价于 `--output json`。
 
 ## 参数补充
 
