@@ -45,11 +45,13 @@ yunxiao mr list --state opened
 - `CI`：在 pull request 和 `main` 分支 push 时运行 `npm ci`、`npm test`、`npm run pack:dry-run`。
 - `Publish`：在推送 `v*.*.*` tag 或手动触发时发布 npm 包。
 
-自动发布需要在 GitHub 仓库的 `Settings -> Secrets and variables -> Actions` 中添加：
+自动发布使用 npm Trusted Publishing，不需要在 GitHub 保存长期 npm token。npm 包设置中需要配置 Trusted Publisher：
 
-```text
-NPM_TOKEN=<npm automation token>
-```
+- Provider：GitHub Actions
+- Organization or user：`coderpp`
+- Repository：`yunxiao-cli`
+- Workflow filename：`publish.yml`
+- Environment name：留空
 
 发布新版本的流程：
 
