@@ -1,0 +1,60 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version to publish, for example 0.1.1"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify version
+        shell: bash
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            expected_version="${{ inputs.version }}"
+          else
+            expected_version="${GITHUB_REF_NAME#v}"
+          fi
+
+          if [[ "$package_version" != "$expected_version" ]]; then
+            echo "package.json version $package_version does not match release version $expected_version" >&2
+            exit 1
+          fi
+
+      - name: Run tests
+        run: npm test
+
+      - name: Verify package contents
+        run: npm run pack:dry-run
+
+      - name: Publish package
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

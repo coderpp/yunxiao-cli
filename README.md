@@ -38,6 +38,33 @@ npm install -g @coderpp/yunxiao-cli
 yunxiao mr list --state opened
 ```
 
+## CI/CD
+
+仓库包含两个 GitHub Actions 工作流：
+
+- `CI`：在 pull request 和 `main` 分支 push 时运行 `npm ci`、`npm test`、`npm run pack:dry-run`。
+- `Publish`：在推送 `v*.*.*` tag 或手动触发时发布 npm 包。
+
+自动发布需要在 GitHub 仓库的 `Settings -> Secrets and variables -> Actions` 中添加：
+
+```text
+NPM_TOKEN=<npm automation token>
+```
+
+发布新版本的流程：
+
+```bash
+npm version patch
+git push origin main --follow-tags
+```
+
+如果手动创建 tag，需要确保 tag 和 `package.json` 版本一致，例如：
+
+```bash
+npm version 0.1.1
+git push origin main v0.1.1
+```
+
 ## 配置
 
 不要把个人访问令牌写入代码或提交到仓库。建议通过环境变量提供：
