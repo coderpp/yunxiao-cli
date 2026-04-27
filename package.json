@@ -3,6 +3,14 @@
   "version": "0.1.2",
   "description": "A CLI for Yunxiao Codeup merge request review and merge workflows.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coderpp/yunxiao-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/coderpp/yunxiao-cli/issues"
+  },
+  "homepage": "https://github.com/coderpp/yunxiao-cli#readme",
   "bin": {
     "yunxiao": "dist/src/index.js"
   },
