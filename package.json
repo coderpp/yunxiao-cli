@@ -1,6 +1,6 @@
 {
   "name": "@coderpp/yunxiao-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A CLI for Yunxiao Codeup merge request review and merge workflows.",
   "type": "module",
   "bin": {
