@@ -175,7 +175,7 @@ test("create change request sends reviewer and branch details", async () => {
     "https://openapi-rdc.aliyuncs.com/oapi/v1/codeup/organizations/org-1/repositories/2813489/changeRequests"
   );
   assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
-    createFrom: "COMMAND_LINE",
+    createFrom: "WEB",
     description: "release notes",
     reviewerUserIds: ["user-1"],
     sourceBranch: "release/1.2.3",

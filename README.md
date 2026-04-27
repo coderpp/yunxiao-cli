@@ -126,6 +126,8 @@ node dist/src/index.js mr release yunxiao-cli release/1.2.3 master --yes
 
 这个命令会先按仓库名称查询代码库 ID，再用当前 token 对应的用户作为评审人创建合并请求，随后评审通过并合并。合并时固定保留源分支，不会删除源分支。
 
+创建合并请求时会使用云效 `createFrom=WEB`，以保证云效能正确解析源分支提交。
+
 查询变更文件树：
 
 ```bash

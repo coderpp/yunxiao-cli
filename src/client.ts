@@ -146,7 +146,7 @@ export class YunxiaoClient {
 
   createChangeRequest(repositoryId: string, options: CreateChangeRequestOptions): Promise<unknown> {
     return this.request("POST", `${this.repositoryPath(repositoryId)}/changeRequests`, undefined, {
-      createFrom: options.createFrom ?? "COMMAND_LINE",
+      createFrom: options.createFrom ?? "WEB",
       description: options.description,
       reviewerUserIds: options.reviewerUserIds,
       sourceBranch: options.sourceBranch,

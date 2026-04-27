@@ -273,7 +273,7 @@ test("release command creates, approves, and merges using repository name", asyn
   assert.match(urls[3], /\/review$/);
   assert.match(urls[4], /\/merge$/);
   assert.deepEqual(bodies[0], {
-    createFrom: "COMMAND_LINE",
+    createFrom: "WEB",
     reviewerUserIds: ["user-1"],
     sourceBranch: "release/1.2.3",
     sourceProjectId: 2813489,
