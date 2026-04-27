@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { YunxiaoClient } from "../src/client.js";
+import { YunxiaoApiError, YunxiaoClient } from "../src/client.js";
 
 function createFetchRecorder(response: unknown = { result: true }) {
   const calls: Array<{ url: string; init: RequestInit }> = [];
@@ -233,4 +233,30 @@ test("release workflow finds repository, creates change request, approves, and m
     mergeType: "no-fast-forward",
     removeSourceBranch: false
   });
+});
+
+test("api errors include request method, url, and response body", async () => {
+  const client = new YunxiaoClient({
+    token: "pt-test",
+    domain: "openapi-rdc.aliyuncs.com",
+    organizationId: "org-1",
+    fetcher: async () =>
+      new Response(JSON.stringify({ code: "Forbidden", message: "no permission" }), {
+        status: 403,
+        headers: { "content-type": "application/json" }
+      })
+  });
+
+  await assert.rejects(
+    () => client.listRepositories({ search: "sjc-web" }),
+    (error) => {
+      assert.ok(error instanceof YunxiaoApiError);
+      assert.equal(error.status, 403);
+      assert.equal(error.method, "GET");
+      assert.match(error.url, /\/repositories\?search=sjc-web$/);
+      assert.match(error.message, /GET https:\/\/openapi-rdc\.aliyuncs\.com/);
+      assert.match(error.message, /no permission/);
+      return true;
+    }
+  );
 });

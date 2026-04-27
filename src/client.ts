@@ -100,7 +100,9 @@ export class YunxiaoApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly responseBody: string
+    readonly responseBody: string,
+    readonly method: string,
+    readonly url: string
   ) {
     super(message);
     this.name = "YunxiaoApiError";
@@ -307,7 +309,13 @@ export class YunxiaoClient {
     const response = await this.fetcher(url.toString(), init);
     const text = await response.text();
     if (!response.ok) {
-      throw new YunxiaoApiError(`Yunxiao API request failed with HTTP ${response.status}`, response.status, text);
+      throw new YunxiaoApiError(
+        `Yunxiao API request failed with HTTP ${response.status}: ${method} ${url.toString()}${text ? `\n${text}` : ""}`,
+        response.status,
+        text,
+        method,
+        url.toString()
+      );
     }
 
     if (!text) {
