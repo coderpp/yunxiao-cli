@@ -50,6 +50,56 @@ export interface ListRepositoriesOptions {
   archived?: boolean;
 }
 
+export interface SearchProjectsOptions {
+  conditions?: string;
+  extraConditions?: string;
+  orderBy?: "gmtCreate" | "name" | string;
+  page?: number;
+  perPage?: number;
+  sort?: "asc" | "desc" | string;
+}
+
+export interface ListProjectMembersOptions {
+  name?: string;
+  roleId?: string;
+}
+
+export interface ChangeProjectMemberOptions {
+  operatorId?: string;
+  roleId: string;
+  userIds: string[];
+}
+
+export interface DeleteProjectMemberOptions {
+  operatorId?: string;
+  roleId: string;
+  userIds: string[];
+}
+
+export interface ListMembersOptions {
+  page?: number;
+  perPage?: number;
+}
+
+export interface SearchWorkitemsOptions {
+  category: string;
+  conditions?: string;
+  orderBy?: "gmtCreate" | "gmtModified" | "updateStatusAt" | "name" | string;
+  page?: number;
+  perPage?: number;
+  sort?: "asc" | "desc" | string;
+  spaceId: string;
+  spaceType?: "Project" | "Program" | string;
+}
+
+export interface CreateWorkitemCommentOptions {
+  content: string;
+  operatorId?: string;
+  parentId?: string;
+}
+
+export type UpdateWorkitemOptions = Record<string, unknown>;
+
 export interface RepositorySummary {
   id: number | string;
   name?: string;
@@ -143,6 +193,90 @@ export class YunxiaoClient {
 
   listRepositories(options: ListRepositoriesOptions = {}): Promise<RepositorySummary[]> {
     return this.request("GET", this.repositoriesPath(), options) as Promise<RepositorySummary[]>;
+  }
+
+  searchProjects(options: SearchProjectsOptions = {}): Promise<unknown> {
+    return this.request("POST", this.projexPath("/projects:search"), undefined, options as Record<string, unknown>);
+  }
+
+  getProject(projectId: string): Promise<unknown> {
+    return this.request("GET", this.projectPath(projectId));
+  }
+
+  listProjectMembers(projectId: string, options: ListProjectMembersOptions = {}): Promise<unknown> {
+    return this.request("GET", `${this.projectPath(projectId)}/members`, options);
+  }
+
+  createProjectMember(projectId: string, options: ChangeProjectMemberOptions): Promise<unknown> {
+    return this.request("POST", `${this.projectPath(projectId)}/members`, undefined, {
+      operatorId: options.operatorId,
+      roleId: options.roleId,
+      userIds: options.userIds
+    });
+  }
+
+  deleteProjectMember(projectId: string, options: DeleteProjectMemberOptions): Promise<unknown> {
+    return this.request("DELETE", `${this.projectPath(projectId)}/members`, undefined, {
+      operatorId: options.operatorId,
+      roleIds: [options.roleId],
+      userId: options.userIds.length === 1 ? options.userIds[0] : undefined,
+      userIds: options.userIds.length > 1 ? options.userIds : undefined
+    });
+  }
+
+  listMembers(options: ListMembersOptions = {}): Promise<unknown> {
+    return this.request("GET", this.platformMembersPath(), options);
+  }
+
+  getMember(memberId: string): Promise<unknown> {
+    return this.request("GET", `${this.platformMembersPath()}/${encodePathSegment(memberId)}`);
+  }
+
+  searchWorkitems(options: SearchWorkitemsOptions): Promise<unknown> {
+    return this.request("POST", this.workitemsSearchPath(), undefined, {
+      category: options.category,
+      conditions: options.conditions,
+      orderBy: options.orderBy,
+      page: options.page,
+      perPage: options.perPage,
+      sort: options.sort,
+      spaceId: options.spaceId,
+      spaceType: options.spaceType ?? "Project"
+    });
+  }
+
+  getWorkitem(workitemId: string): Promise<unknown> {
+    return this.request("GET", `${this.projexPath("/workitems")}/${encodePathSegment(workitemId)}`);
+  }
+
+  updateWorkitem(workitemId: string, options: UpdateWorkitemOptions): Promise<unknown> {
+    return this.request("PUT", `${this.projexPath("/workitems")}/${encodePathSegment(workitemId)}`, undefined, options);
+  }
+
+  listWorkitemActivities(workitemId: string): Promise<unknown> {
+    return this.request("GET", `${this.projexPath("/workitems")}/${encodePathSegment(workitemId)}/activities`);
+  }
+
+  listWorkitemComments(workitemId: string): Promise<unknown> {
+    return this.request("GET", `${this.projexPath("/workitems")}/${encodePathSegment(workitemId)}/comments`);
+  }
+
+  createWorkitemComment(workitemId: string, options: CreateWorkitemCommentOptions): Promise<unknown> {
+    return this.request("POST", `${this.projexPath("/workitems")}/${encodePathSegment(workitemId)}/comments`, undefined, {
+      content: options.content,
+      operatorId: options.operatorId,
+      parentId: options.parentId
+    });
+  }
+
+  async getWorkitemTimeline(workitemId: string): Promise<unknown> {
+    const [workitem, activities, comments] = await Promise.all([
+      this.getWorkitem(workitemId),
+      this.listWorkitemActivities(workitemId),
+      this.listWorkitemComments(workitemId)
+    ]);
+
+    return { workitem, activities, comments };
   }
 
   createChangeRequest(repositoryId: string, options: CreateChangeRequestOptions): Promise<unknown> {
@@ -291,8 +425,38 @@ export class YunxiaoClient {
     return `${this.repositoryPath(repositoryId)}/changeRequests/${localId}`;
   }
 
+  private projexPath(path: string): string {
+    if (this.edition === "center") {
+      return `/oapi/v1/projex/organizations/${encodePathSegment(this.organizationId ?? "")}${path}`;
+    }
+
+    return `/oapi/v1/projex${path}`;
+  }
+
+  private workitemsSearchPath(): string {
+    if (this.edition === "center") {
+      return this.projexPath("/workitems:search");
+    }
+
+    return this.organizationId
+      ? `/oapi/v1/projex/${encodePathSegment(this.organizationId)}/workitems:search`
+      : "/oapi/v1/projex/workitems:search";
+  }
+
+  private projectPath(projectId: string): string {
+    return `${this.projexPath("/projects")}/${encodePathSegment(projectId)}`;
+  }
+
+  private platformMembersPath(): string {
+    if (this.edition === "center") {
+      return `/oapi/v1/platform/organizations/${encodePathSegment(this.organizationId ?? "")}/members`;
+    }
+
+    return "/oapi/v1/platform/members";
+  }
+
   private async request(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PUT" | "DELETE",
     path: string,
     query?: object,
     body?: Record<string, unknown>

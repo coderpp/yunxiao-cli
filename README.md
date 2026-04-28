@@ -1,6 +1,6 @@
 # @coderpp/yunxiao-cli
 
-用于评审和合并云效 Codeup 合并请求的命令行工具。
+用于评审和合并云效 Codeup 合并请求、查询项目协作工作项并维护项目成员的命令行工具。
 
 ## 安装
 
@@ -78,6 +78,8 @@ export YUNXIAO_TOKEN="pt-..."
 export YUNXIAO_DOMAIN="openapi-rdc.aliyuncs.com"
 export YUNXIAO_ORGANIZATION_ID="your-organization-id"
 export YUNXIAO_EDITION="center"
+export YUNXIAO_PROJECT_IDS="project-id-1,project-id-2"
+export YUNXIAO_WORKITEM_CATEGORIES="Req,Task,Bug"
 ```
 
 说明：
@@ -85,8 +87,10 @@ export YUNXIAO_EDITION="center"
 - 中心版默认使用 `openapi-rdc.aliyuncs.com`，并需要 `YUNXIAO_ORGANIZATION_ID`。
 - Region 版设置 `YUNXIAO_EDITION=region`，通常不需要组织 ID。
 - 也可以用命令参数覆盖配置：`--token`、`--domain`、`--organization-id`、`--edition`。
+- 工作项查询不会默认扫描所有项目，需要通过 `--project-id`、`--project-ids` 或 `YUNXIAO_PROJECT_IDS` 指定项目范围。
+- 工作项类型默认查询 `Req,Task,Bug`，可以通过 `--category` 或 `YUNXIAO_WORKITEM_CATEGORIES` 覆盖。
 
-## 命令
+## 合并请求命令
 
 查询合并请求列表：
 
@@ -204,3 +208,132 @@ node dist/src/index.js mr patches 2813489 12 --output json
 这是为了避免误合并。
 
 未指定 `--merge-type` 时，默认使用 `no-fast-forward`。
+
+## 项目与成员命令
+
+查询项目列表：
+
+```bash
+node dist/src/index.js project list --name 研发 --output table
+```
+
+获取项目信息：
+
+```bash
+node dist/src/index.js project get <projectId> --output json
+```
+
+获取项目成员：
+
+```bash
+node dist/src/index.js project members <projectId> --role-id project.admin
+```
+
+添加项目成员：
+
+```bash
+node dist/src/index.js project member-add <projectId> \
+  --user-ids user-id-1,user-id-2 \
+  --role-id project.participant \
+  --yes
+```
+
+移除项目成员：
+
+```bash
+node dist/src/index.js project member-remove <projectId> \
+  --user-ids user-id-1 \
+  --role-id project.participant \
+  --yes
+```
+
+查询组织成员：
+
+```bash
+node dist/src/index.js member list --per-page 100
+node dist/src/index.js member get <memberId> --output json
+```
+
+## 工作项命令
+
+查询当前用户待办工作项：
+
+```bash
+node dist/src/index.js workitem mine --project-ids project-id-1,project-id-2 --state todo
+```
+
+查询指定成员待办、进行中或已完成工作项：
+
+```bash
+node dist/src/index.js workitem list --project-ids project-id-1,project-id-2 --assigned-to user-id --state todo
+node dist/src/index.js workitem list --project-ids project-id-1,project-id-2 --assigned-to user-id --state doing
+node dist/src/index.js workitem list --project-ids project-id-1,project-id-2 --assigned-to user-id --state done
+```
+
+按时间范围查询工作项：
+
+```bash
+node dist/src/index.js workitem list \
+  --project-ids project-id-1,project-id-2 \
+  --from "2026-04-01 00:00:00" \
+  --to "2026-04-30 23:59:59"
+```
+
+默认时间字段为 `gmtCreate`。如需按更新时间等字段过滤，可加 `--date-field gmtModified` 或其他云效支持的字段标识。
+
+如果已知云效状态 ID，可使用服务端状态过滤：
+
+```bash
+node dist/src/index.js workitem list --project-ids project-id-1 --status-ids 100005,100010
+```
+
+`--state todo|doing|done` 是便捷过滤，会根据返回结果中的状态英文名或中文名做本地过滤；不同项目模板状态差异较大时，优先使用 `--status-ids`。
+
+默认只查询每个项目的一页结果。需要拉取所有分页时可以加 `--all-pages`：
+
+```bash
+node dist/src/index.js workitem list --project-ids project-id-1,project-id-2 --all-pages
+```
+
+获取工作项详情、动态、评论：
+
+```bash
+node dist/src/index.js workitem get <workitemId> --output json
+node dist/src/index.js workitem activities <workitemId>
+node dist/src/index.js workitem comments <workitemId>
+node dist/src/index.js workitem timeline <workitemId> --output json
+```
+
+修改工作项负责人、参与人和计划完成时间：
+
+```bash
+node dist/src/index.js workitem update <workitemId> \
+  --assigned-to user-id \
+  --participants user-id-1,user-id-2 \
+  --due-date "2026-05-01 18:00:00" \
+  --yes
+```
+
+计划完成时间默认写入字段 `dueDate`。如果项目模板使用的是自定义字段，可以用 `--due-field <fieldId>` 覆盖：
+
+```bash
+node dist/src/index.js workitem update <workitemId> \
+  --due-field custom-plan-finish-field-id \
+  --due-date "2026-05-01 18:00:00" \
+  --yes
+```
+
+也可以用 `--field key=value` 或 `--fields '{"fieldId":"value"}'` 更新云效支持的其他字段。
+
+创建工作项评论：
+
+```bash
+node dist/src/index.js workitem comment <workitemId> --content "处理完成，请确认。" --yes
+```
+
+会改变云效数据的命令需要 `--yes`：
+
+- `project member-add`
+- `project member-remove`
+- `workitem update`
+- `workitem comment`

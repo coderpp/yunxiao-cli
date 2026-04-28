@@ -326,3 +326,157 @@ test("release command supports create-only mode", async () => {
   assert.equal(result.review, null);
   assert.equal(result.merge, null);
 });
+
+test("project member-add command requires confirmation and sends member body", async () => {
+  const urls: string[] = [];
+  const bodies: unknown[] = [];
+  const exitCode = await runCli(
+    ["project", "member-add", "project-1", "--user-ids", "user-1,user-2", "--role-id", "project.admin", "--yes"],
+    {
+      YUNXIAO_TOKEN: "pt-test",
+      YUNXIAO_ORGANIZATION_ID: "org-1"
+    },
+    {
+      fetcher: async (url, init) => {
+        urls.push(String(url));
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({ result: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      },
+      stdout: () => {},
+      stderr: () => {}
+    }
+  );
+
+  assert.equal(exitCode, 0);
+  assert.equal(
+    urls[0],
+    "https://openapi-rdc.aliyuncs.com/oapi/v1/projex/organizations/org-1/projects/project-1/members"
+  );
+  assert.deepEqual(bodies[0], {
+    roleId: "project.admin",
+    userIds: ["user-1", "user-2"]
+  });
+});
+
+test("workitem mine searches configured projects and filters todo state", async () => {
+  const urls: string[] = [];
+  const bodies: unknown[] = [];
+  const responses = [
+    { id: "user-1", name: "Current User" },
+    [
+      {
+        id: "wi-1",
+        subject: "处理待办",
+        status: { nameEn: "TODO", displayName: "待处理" },
+        assignedTo: { id: "user-1", name: "Current User" }
+      }
+    ],
+    [
+      {
+        id: "wi-2",
+        subject: "进行中事项",
+        status: { nameEn: "DOING", displayName: "进行中" },
+        assignedTo: { id: "user-1", name: "Current User" }
+      }
+    ]
+  ];
+  let stdout = "";
+
+  const exitCode = await runCli(
+    ["workitem", "mine", "--project-ids", "project-1,project-2", "--state", "todo", "--output", "json"],
+    {
+      YUNXIAO_TOKEN: "pt-test",
+      YUNXIAO_ORGANIZATION_ID: "org-1",
+      YUNXIAO_WORKITEM_CATEGORIES: "Req,Task"
+    },
+    {
+      fetcher: async (url, init) => {
+        urls.push(String(url));
+        if (init?.body) {
+          bodies.push(JSON.parse(String(init.body)));
+        }
+        return new Response(JSON.stringify(responses.shift()), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      },
+      stdout: (text) => {
+        stdout += text;
+      },
+      stderr: () => {}
+    }
+  );
+
+  assert.equal(exitCode, 0);
+  assert.match(urls[0], /\/platform\/user$/);
+  assert.match(urls[1], /\/workitems:search$/);
+  assert.match(urls[2], /\/workitems:search$/);
+  assert.deepEqual(bodies[0], {
+    category: "Req,Task",
+    conditions:
+      '{"conditionGroups":[[{"fieldIdentifier":"assignedTo","operator":"CONTAINS","value":["user-1"],"toValue":null,"className":"user","format":"list"}]]}',
+    orderBy: "gmtCreate",
+    page: 1,
+    perPage: 20,
+    sort: "desc",
+    spaceId: "project-1",
+    spaceType: "Project"
+  });
+  assert.deepEqual(JSON.parse(stdout), [
+    {
+      queryProjectId: "project-1",
+      id: "wi-1",
+      subject: "处理待办",
+      status: { nameEn: "TODO", displayName: "待处理" },
+      assignedTo: { id: "user-1", name: "Current User" }
+    }
+  ]);
+});
+
+test("workitem update supports assigned user, participants, due date, and custom fields", async () => {
+  let body: unknown;
+  const exitCode = await runCli(
+    [
+      "workitem",
+      "update",
+      "workitem-1",
+      "--assigned-to",
+      "user-2",
+      "--participants",
+      "user-2,user-3",
+      "--due-date",
+      "2026-05-01 18:00:00",
+      "--field",
+      "priority=high",
+      "--yes",
+      "--output",
+      "json"
+    ],
+    {
+      YUNXIAO_TOKEN: "pt-test",
+      YUNXIAO_ORGANIZATION_ID: "org-1"
+    },
+    {
+      fetcher: async (_url, init) => {
+        body = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ result: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      },
+      stdout: () => {},
+      stderr: () => {}
+    }
+  );
+
+  assert.equal(exitCode, 0);
+  assert.deepEqual(body, {
+    assignedTo: "user-2",
+    dueDate: "2026-05-01 18:00:00",
+    participants: ["user-2", "user-3"],
+    priority: "high"
+  });
+});

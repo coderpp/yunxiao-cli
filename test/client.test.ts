@@ -273,6 +273,129 @@ test("release workflow can create only without review or merge", async () => {
   });
 });
 
+test("project APIs build projex URLs and request bodies", async () => {
+  const { calls, fetcher } = createFetchRecorder([]);
+  const client = new YunxiaoClient({
+    token: "pt-test",
+    domain: "openapi-rdc.aliyuncs.com",
+    organizationId: "org-1",
+    fetcher
+  });
+
+  await client.searchProjects({
+    conditions: JSON.stringify({ conditionGroups: [[]] }),
+    page: 1,
+    perPage: 20,
+    sort: "desc"
+  });
+  await client.listProjectMembers("project-1", { name: "Alice", roleId: "project.admin" });
+  await client.createProjectMember("project-1", {
+    roleId: "project.participant",
+    userIds: ["user-1", "user-2"]
+  });
+  await client.deleteProjectMember("project-1", {
+    roleId: "project.participant",
+    userIds: ["user-1"]
+  });
+
+  assert.equal(calls[0].url, "https://openapi-rdc.aliyuncs.com/oapi/v1/projex/organizations/org-1/projects:search");
+  assert.equal(calls[0].init.method, "POST");
+  assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
+    conditions: JSON.stringify({ conditionGroups: [[]] }),
+    page: 1,
+    perPage: 20,
+    sort: "desc"
+  });
+  assert.equal(
+    calls[1].url,
+    "https://openapi-rdc.aliyuncs.com/oapi/v1/projex/organizations/org-1/projects/project-1/members?name=Alice&roleId=project.admin"
+  );
+  assert.deepEqual(JSON.parse(String(calls[2].init.body)), {
+    roleId: "project.participant",
+    userIds: ["user-1", "user-2"]
+  });
+  assert.deepEqual(JSON.parse(String(calls[3].init.body)), {
+    roleIds: ["project.participant"],
+    userId: "user-1"
+  });
+});
+
+test("organization member APIs support center edition paths", async () => {
+  const { calls, fetcher } = createFetchRecorder([]);
+  const client = new YunxiaoClient({
+    token: "pt-test",
+    domain: "openapi-rdc.aliyuncs.com",
+    organizationId: "org-1",
+    fetcher
+  });
+
+  await client.listMembers({ page: 2, perPage: 50 });
+  await client.getMember("user-1");
+
+  assert.equal(
+    calls[0].url,
+    "https://openapi-rdc.aliyuncs.com/oapi/v1/platform/organizations/org-1/members?page=2&perPage=50"
+  );
+  assert.equal(calls[1].url, "https://openapi-rdc.aliyuncs.com/oapi/v1/platform/organizations/org-1/members/user-1");
+});
+
+test("workitem APIs build projex URLs and request bodies", async () => {
+  const { calls, fetcher } = createFetchRecorder({ id: "comment-1" });
+  const client = new YunxiaoClient({
+    token: "pt-test",
+    domain: "openapi-rdc.aliyuncs.com",
+    organizationId: "org-1",
+    fetcher
+  });
+
+  await client.searchWorkitems({
+    category: "Req,Task",
+    conditions: JSON.stringify({ conditionGroups: [[]] }),
+    page: 1,
+    perPage: 100,
+    sort: "desc",
+    spaceId: "project-1"
+  });
+  await client.updateWorkitem("workitem-1", {
+    assignedTo: "user-1",
+    participants: ["user-1", "user-2"],
+    dueDate: "2026-05-01 18:00:00"
+  });
+  await client.createWorkitemComment("workitem-1", {
+    content: "请关注这个变更",
+    parentId: "comment-parent"
+  });
+
+  assert.equal(calls[0].url, "https://openapi-rdc.aliyuncs.com/oapi/v1/projex/organizations/org-1/workitems:search");
+  assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
+    category: "Req,Task",
+    conditions: JSON.stringify({ conditionGroups: [[]] }),
+    page: 1,
+    perPage: 100,
+    sort: "desc",
+    spaceId: "project-1",
+    spaceType: "Project"
+  });
+  assert.equal(calls[1].init.method, "PUT");
+  assert.equal(
+    calls[1].url,
+    "https://openapi-rdc.aliyuncs.com/oapi/v1/projex/organizations/org-1/workitems/workitem-1"
+  );
+  assert.deepEqual(JSON.parse(String(calls[1].init.body)), {
+    assignedTo: "user-1",
+    dueDate: "2026-05-01 18:00:00",
+    participants: ["user-1", "user-2"]
+  });
+  assert.equal(
+    calls[2].url,
+    "https://openapi-rdc.aliyuncs.com/oapi/v1/projex/organizations/org-1/workitems/workitem-1/comments"
+  );
+  assert.deepEqual(JSON.parse(String(calls[2].init.body)), {
+    content: "请关注这个变更",
+    parentId: "comment-parent"
+  });
+});
+
 test("api errors include request method, url, and response body", async () => {
   const client = new YunxiaoClient({
     token: "pt-test",
