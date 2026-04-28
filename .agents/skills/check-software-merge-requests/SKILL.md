@@ -38,6 +38,7 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao mr list --state opened --output
 
 3. 根据用户要求处理：
 
+- 如果用户只要求“查看”“看下”“不合并”，只汇报待合并请求，不执行任何评审或合并命令。
 - 如果用户指定某个请求，只处理指定请求。
 - 如果用户要求处理所有请求，只处理白名单仓库中的所有请求。
 
@@ -49,6 +50,7 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao mr approve-and-merge <repositor
 
 5. 汇报合并结果，至少包含：
 
+- 如果只是查看：列出待处理请求，明确说明未执行合并。
 - 已合并请求列表：仓库、合并请求 ID、标题或源/目标分支。
 - 已忽略请求列表：说明因为仓库不在白名单而忽略。
 - 失败或停止原因。

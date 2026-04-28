@@ -148,6 +148,16 @@ node dist/src/index.js mr release syjc-web release master --yes --create-only
 
 创建合并请求时会使用云效 `createFrom=WEB`，以保证云效能正确解析源分支提交。
 
+发布版本时，如果云效返回“源分支相对目标分支没有改动，不能新建代码评审”，可视为该仓库无改动并跳过。
+
+发布所有版本时，推荐顺序为：
+
+1. 商混版：`master` -> `gx-concrete/dev`
+2. 蜀道版：`master` -> `sdjt/dev`
+3. 标准版：`master` -> `release`
+
+标准版应最后发布。
+
 查询变更文件树：
 
 ```bash
