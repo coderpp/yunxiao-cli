@@ -1,6 +1,6 @@
 {
   "name": "@coderpp/yunxiao-cli",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "A CLI for Yunxiao merge request, project member, and workitem workflows.",
   "type": "module",
   "repository": {
