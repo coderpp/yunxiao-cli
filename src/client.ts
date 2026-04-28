@@ -82,6 +82,7 @@ export interface ReleaseByRepositoryNameOptions {
   repositoryName: string;
   sourceBranch: string;
   targetBranch: string;
+  createOnly?: boolean;
   title?: string;
   description?: string;
   mergeType?: MergeChangeRequestOptions["mergeType"];
@@ -90,8 +91,8 @@ export interface ReleaseByRepositoryNameOptions {
 export interface ReleaseResult {
   repository: RepositorySummary;
   changeRequest: unknown;
-  review: unknown;
-  merge: unknown;
+  review: unknown | null;
+  merge: unknown | null;
 }
 
 export interface ApproveAndMergeOptions extends ReviewChangeRequestOptions, MergeChangeRequestOptions {}
@@ -236,6 +237,15 @@ export class YunxiaoClient {
       description: options.description
     });
     const localId = localIdFromChangeRequest(changeRequest);
+    if (options.createOnly) {
+      return {
+        repository,
+        changeRequest,
+        review: null,
+        merge: null
+      };
+    }
+
     const review = await this.reviewChangeRequest(repositoryId, localId, {
       reviewComment: "Approved by yunxiao-cli release workflow"
     });

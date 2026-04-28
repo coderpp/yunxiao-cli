@@ -288,3 +288,41 @@ test("release command creates, approves, and merges using repository name", asyn
   });
   assert.equal(JSON.parse(stdout).merge.status, "MERGED");
 });
+
+test("release command supports create-only mode", async () => {
+  const urls: string[] = [];
+  const responses = [
+    { id: "user-1", name: "Release Owner" },
+    [{ id: 2813489, name: "yunxiao-cli", path: "yunxiao-cli" }],
+    { localId: 18, projectId: 2813489, title: "Release release/1.2.3 into master" }
+  ];
+  let stdout = "";
+  const exitCode = await runCli(
+    ["mr", "release", "yunxiao-cli", "release/1.2.3", "master", "--yes", "--create-only", "--output", "json"],
+    {
+      YUNXIAO_TOKEN: "pt-test",
+      YUNXIAO_ORGANIZATION_ID: "org-1"
+    },
+    {
+      fetcher: async (url) => {
+        urls.push(String(url));
+        return new Response(JSON.stringify(responses.shift()), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      },
+      stdout: (text) => {
+        stdout += text;
+      },
+      stderr: () => {}
+    }
+  );
+
+  assert.equal(exitCode, 0);
+  assert.equal(urls.length, 3);
+  assert.match(urls[2], /\/repositories\/2813489\/changeRequests$/);
+  const result = JSON.parse(stdout);
+  assert.equal(result.changeRequest.localId, 18);
+  assert.equal(result.review, null);
+  assert.equal(result.merge, null);
+});

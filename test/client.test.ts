@@ -235,6 +235,44 @@ test("release workflow finds repository, creates change request, approves, and m
   });
 });
 
+test("release workflow can create only without review or merge", async () => {
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const responses = [
+    { id: "user-1", name: "Release Owner" },
+    [{ id: 2813489, name: "yunxiao-cli", path: "yunxiao-cli" }],
+    { localId: 18, projectId: 2813489 }
+  ];
+  const fetcher = async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), init: init ?? {} });
+    return new Response(JSON.stringify(responses.shift()), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  const client = new YunxiaoClient({
+    token: "pt-test",
+    domain: "openapi-rdc.aliyuncs.com",
+    organizationId: "org-1",
+    fetcher
+  });
+
+  const result = await client.releaseByRepositoryName({
+    repositoryName: "yunxiao-cli",
+    sourceBranch: "release/1.2.3",
+    targetBranch: "master",
+    createOnly: true
+  });
+
+  assert.equal(calls.length, 3);
+  assert.match(calls[2].url, /\/repositories\/2813489\/changeRequests$/);
+  assert.deepEqual(result, {
+    repository: { id: 2813489, name: "yunxiao-cli", path: "yunxiao-cli" },
+    changeRequest: { localId: 18, projectId: 2813489 },
+    review: null,
+    merge: null
+  });
+});
+
 test("api errors include request method, url, and response body", async () => {
   const client = new YunxiaoClient({
     token: "pt-test",
