@@ -47,6 +47,19 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao member list --per-page 100 --ou
 
 如果姓名匹配多个成员，必须停止并请用户确认具体用户。
 
+## 产品同事排除规则
+
+当用户要求查询“所有成员”的待办、进行中或已完成工作项时，默认从结果中排除以下产品同事：
+
+- 蒋鹏
+- 李莎仕
+- 刘志鹏
+- 罗宇辉
+- 顾宝程
+- 刘远航
+
+该规则只用于“所有成员”汇总或列表。用户明确指定某个成员时，即使该成员在排除名单中，也按用户指定查询。
+
 ## 查询工作项
 
 当前用户待办工作项：
@@ -67,6 +80,8 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <us
 npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state todo --all-pages --output json
 ```
 
+查询结果中排除产品同事后再汇总和汇报。
+
 所有或指定成员进行中的工作项：
 
 ```bash
@@ -74,12 +89,16 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state doing --a
 npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <userId> --state doing --all-pages --output json
 ```
 
+只有未指定成员的“所有成员进行中”查询需要排除产品同事。
+
 所有或指定成员已完成的工作项：
 
 ```bash
 npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state done --all-pages --output json
 npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <userId> --state done --all-pages --output json
 ```
+
+只有未指定成员的“所有成员已完成”查询需要排除产品同事。
 
 按时间范围查询时追加：
 
@@ -159,9 +178,10 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao project member-remove <projectI
 查询类任务汇报：
 
 - 项目范围。
-- 总数。
+- 总数；如果应用了产品同事排除规则，同时汇报排除后总数。
 - 按负责人或状态汇总。
 - 关键明细：编号、标题、状态、负责人、工作项 ID。
+- 如果应用了产品同事排除规则，说明已排除的产品同事名单。
 
 变更类任务汇报：
 
