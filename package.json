@@ -1,7 +1,7 @@
 {
   "name": "@coderpp/yunxiao-cli",
-  "version": "0.1.8",
-  "description": "A CLI for Yunxiao merge request, project member, and workitem workflows.",
+  "version": "0.1.9",
+  "description": "A CLI for Yunxiao merge request, pipeline retry, project member, and workitem workflows.",
   "type": "module",
   "repository": {
     "type": "git",
@@ -18,6 +18,11 @@
     "build": "tsc -p tsconfig.json",
     "pack:dry-run": "npm pack --dry-run",
     "prepack": "npm run build",
+    "skills:sync": "scripts/sync-skills.sh",
+    "skills:watch": "scripts/watch-skills.sh",
+    "skills:watch:start": "scripts/start-skill-sync-watch.sh",
+    "skills:watch:status": "scripts/status-skill-sync-watch.sh",
+    "skills:watch:stop": "scripts/stop-skill-sync-watch.sh",
     "test": "tsc -p tsconfig.json && node --test dist/test/*.test.js"
   },
   "publishConfig": {

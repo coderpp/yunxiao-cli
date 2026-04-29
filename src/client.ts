@@ -100,6 +100,47 @@ export interface CreateWorkitemCommentOptions {
 
 export type UpdateWorkitemOptions = Record<string, unknown>;
 
+export interface ListPipelineRunsOptions {
+  page?: number;
+  perPage?: number;
+  startTime?: number;
+  endTime?: number;
+  status?: "FAIL" | "SUCCESS" | "RUNNING" | string;
+  triggerMode?: number;
+}
+
+export interface ListPipelinesOptions {
+  createStartTime?: number;
+  createEndTime?: number;
+  executeStartTime?: number;
+  executeEndTime?: number;
+  pipelineName?: string;
+  statusList?: string;
+  page?: number;
+  perPage?: number;
+}
+
+export interface ListLatestFailedPipelineRunsOptions {
+  hours?: number;
+  startTime?: number;
+  endTime?: number;
+  perPage?: number;
+}
+
+export interface LatestFailedPipelineRun {
+  pipelineId: number | string;
+  pipelineName: string;
+  pipelineRunId: number | string;
+  status?: string;
+  triggerMode?: number | string;
+  triggerModeName: string;
+  startTime?: number | string;
+  startTimeText: string;
+  endTime?: number | string;
+  endTimeText: string;
+  creatorAccountId?: string;
+}
+
 export interface RepositorySummary {
   id: number | string;
   name?: string;
@@ -279,6 +320,98 @@ export class YunxiaoClient {
     return { workitem, activities, comments };
   }
 
+  listPipelineRuns(pipelineId: string, options: ListPipelineRunsOptions = {}): Promise<unknown> {
+    return this.request("GET", `${this.pipelinePath(pipelineId)}/runs`, {
+      page: options.page,
+      perPage: options.perPage,
+      startTime: options.startTime,
+      endTme: options.endTime,
+      status: options.status,
+      triggerMode: options.triggerMode
+    });
+  }
+
+  listPipelines(options: ListPipelinesOptions = {}): Promise<unknown> {
+    return this.request("GET", this.pipelinesPath(), {
+      page: options.page,
+      perPage: options.perPage,
+      executeStartTime: options.executeStartTime,
+      executeEndTime: options.executeEndTime,
+      statusList: options.statusList,
+      pipelineName: options.pipelineName,
+      createStartTime: options.createStartTime,
+      createEndTime: options.createEndTime
+    });
+  }
+
+  async listLatestFailedPipelineRuns(
+    options: ListLatestFailedPipelineRunsOptions = {}
+  ): Promise<LatestFailedPipelineRun[]> {
+    const endTime = options.endTime ?? Date.now();
+    const startTime = options.startTime ?? endTime - (options.hours ?? 24) * 60 * 60 * 1000;
+    const perPage = options.perPage ?? 30;
+    const pipelines = await this.listAllPipelines({
+      page: 1,
+      perPage,
+      executeStartTime: startTime,
+      executeEndTime: endTime,
+      statusList: "FAIL"
+    });
+    const uniquePipelines = uniqueBy(pipelines, (pipeline) => String(recordValue(pipeline, "pipelineId") ?? recordValue(pipeline, "id")));
+    const results: LatestFailedPipelineRun[] = [];
+
+    for (const pipeline of uniquePipelines) {
+      const pipelineId = recordValue(pipeline, "pipelineId") ?? recordValue(pipeline, "id");
+      if (pipelineId === undefined || pipelineId === null || pipelineId === "") {
+        continue;
+      }
+
+      const runs = await this.listAllPipelineRuns(String(pipelineId), {
+        page: 1,
+        perPage,
+        startTime,
+        endTime,
+        status: "FAIL"
+      });
+      const latestRun = runs
+        .filter((run) => timestampInRange(recordValue(run, "startTime"), startTime, endTime))
+        .sort((left, right) => Number(recordValue(right, "startTime") ?? 0) - Number(recordValue(left, "startTime") ?? 0))[0];
+      if (!latestRun) {
+        continue;
+      }
+
+      results.push({
+        pipelineId: normalizeNumericId(pipelineId),
+        pipelineName: stringRecordValue(pipeline, "pipelineName") ?? stringRecordValue(pipeline, "name") ?? "",
+        pipelineRunId: normalizeNumericId(recordValue(latestRun, "pipelineRunId") ?? ""),
+        status: stringRecordValue(latestRun, "status"),
+        triggerMode: numericOrStringValue(recordValue(latestRun, "triggerMode")),
+        triggerModeName: triggerModeName(recordValue(latestRun, "triggerMode")),
+        startTime: numericOrStringValue(recordValue(latestRun, "startTime")),
+        startTimeText: formatTimestamp(recordValue(latestRun, "startTime")),
+        endTime: numericOrStringValue(recordValue(latestRun, "endTime")),
+        endTimeText: formatTimestamp(recordValue(latestRun, "endTime")),
+        creatorAccountId: stringRecordValue(latestRun, "creatorAccountId")
+      });
+    }
+
+    return results.sort((left, right) => Number(right.startTime ?? 0) - Number(left.startTime ?? 0));
+  }
+
+  getPipelineRun(pipelineId: string, pipelineRunId: string): Promise<unknown> {
+    return this.request(
+      "GET",
+      `${this.pipelinePath(pipelineId)}/runs/${encodePathSegment(pipelineRunId)}`
+    );
+  }
+
+  retryPipelineJobRun(pipelineId: string, pipelineRunId: string, jobId: string): Promise<unknown> {
+    return this.request(
+      "PUT",
+      `${this.pipelinePath(pipelineId)}/pipelineRuns/${encodePathSegment(pipelineRunId)}/jobs/${encodePathSegment(jobId)}/retry`
+    );
+  }
+
   createChangeRequest(repositoryId: string, options: CreateChangeRequestOptions): Promise<unknown> {
     return this.request("POST", `${this.repositoryPath(repositoryId)}/changeRequests`, undefined, {
       createFrom: options.createFrom ?? "WEB",
@@ -455,6 +588,54 @@ export class YunxiaoClient {
     return "/oapi/v1/platform/members";
   }
 
+  private pipelinesPath(): string {
+    if (this.edition === "center") {
+      return `/oapi/v1/flow/organizations/${encodePathSegment(this.organizationId ?? "")}/pipelines`;
+    }
+
+    return "/oapi/v1/flow/pipelines";
+  }
+
+  private pipelinePath(pipelineId: string): string {
+    const encodedPipelineId = encodePathSegment(pipelineId);
+    return `${this.pipelinesPath()}/${encodedPipelineId}`;
+  }
+
+  private async listAllPipelines(options: ListPipelinesOptions): Promise<Array<Record<string, unknown>>> {
+    const rows: Array<Record<string, unknown>> = [];
+    const perPage = options.perPage ?? 30;
+
+    for (let page = options.page ?? 1; ; page += 1) {
+      const response = await this.listPipelines({ ...options, page, perPage });
+      const pageRows = arrayRecords(response);
+      rows.push(...pageRows);
+      if (pageRows.length < perPage) {
+        break;
+      }
+    }
+
+    return rows;
+  }
+
+  private async listAllPipelineRuns(
+    pipelineId: string,
+    options: ListPipelineRunsOptions
+  ): Promise<Array<Record<string, unknown>>> {
+    const rows: Array<Record<string, unknown>> = [];
+    const perPage = options.perPage ?? 30;
+
+    for (let page = options.page ?? 1; ; page += 1) {
+      const response = await this.listPipelineRuns(pipelineId, { ...options, page, perPage });
+      const pageRows = arrayRecords(response);
+      rows.push(...pageRows);
+      if (pageRows.length < perPage) {
+        break;
+      }
+    }
+
+    return rows;
+  }
+
   private async request(
     method: "GET" | "POST" | "PUT" | "DELETE",
     path: string,
@@ -506,6 +687,90 @@ function stripProtocol(domain: string): string {
 
 function encodePathSegment(value: string): string {
   return encodeURIComponent(value);
+}
+
+function arrayRecords(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function recordValue(record: Record<string, unknown>, key: string): unknown {
+  return record[key];
+}
+
+function stringRecordValue(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function uniqueBy<T>(values: T[], keyFn: (value: T) => string): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const value of values) {
+    const key = keyFn(value);
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(value);
+  }
+  return result;
+}
+
+function timestampInRange(value: unknown, startTime: number, endTime: number): boolean {
+  const timestamp = Number(value);
+  return Number.isFinite(timestamp) && timestamp >= startTime && timestamp <= endTime;
+}
+
+function normalizeNumericId(value: unknown): number | string {
+  const numberValue = Number(value);
+  return Number.isInteger(numberValue) ? numberValue : String(value);
+}
+
+function numericOrStringValue(value: unknown): number | string | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : String(value);
+}
+
+function formatTimestamp(value: unknown): string {
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp)) {
+    return "";
+  }
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(
+    date.getMinutes()
+  )}:${pad(date.getSeconds())}`;
+}
+
+function triggerModeName(value: unknown): string {
+  switch (Number(value)) {
+    case 1:
+      return "人工触发";
+    case 2:
+      return "定时触发";
+    case 3:
+      return "代码提交触发";
+    case 5:
+      return "流水线触发";
+    case 6:
+      return "Webhook触发";
+    default:
+      return value === undefined || value === null ? "" : String(value);
+  }
 }
 
 function compactBody<T extends Record<string, unknown>>(body: T): Partial<T> {

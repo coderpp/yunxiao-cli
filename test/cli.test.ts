@@ -480,3 +480,163 @@ test("workitem update supports assigned user, participants, due date, and custom
     priority: "high"
   });
 });
+
+test("pipeline runs command sends list filters and prints JSON", async () => {
+  const urls: string[] = [];
+  let stdout = "";
+  const exitCode = await runCli(
+    [
+      "pipeline",
+      "runs",
+      "123",
+      "--status",
+      "FAIL",
+      "--start-time",
+      "1729178040000",
+      "--end-time",
+      "1729181640000",
+      "--trigger-mode",
+      "3",
+      "--output",
+      "json"
+    ],
+    {
+      YUNXIAO_TOKEN: "pt-test",
+      YUNXIAO_ORGANIZATION_ID: "org-1"
+    },
+    {
+      fetcher: async (url) => {
+        urls.push(String(url));
+        return new Response(JSON.stringify([{ pipelineRunId: 456, pipelineId: 123, status: "FAIL" }]), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      },
+      stdout: (text) => {
+        stdout += text;
+      },
+      stderr: () => {}
+    }
+  );
+
+  assert.equal(exitCode, 0);
+  assert.equal(
+    urls[0],
+    "https://openapi-rdc.aliyuncs.com/oapi/v1/flow/organizations/org-1/pipelines/123/runs?startTime=1729178040000&endTme=1729181640000&status=FAIL&triggerMode=3"
+  );
+  assert.deepEqual(JSON.parse(stdout), [{ pipelineRunId: 456, pipelineId: 123, status: "FAIL" }]);
+});
+
+test("pipeline failed-runs keeps latest failed run per pipeline", async () => {
+  const urls: string[] = [];
+  const responses = [
+    [
+      { pipelineId: 1, pipelineName: "后端流水线" },
+      { pipelineId: 2, pipelineName: "前端流水线" }
+    ],
+    [
+      { pipelineRunId: 10, pipelineId: 1, status: "FAIL", startTime: 1999998000000, endTime: 1999998100000 },
+      { pipelineRunId: 11, pipelineId: 1, status: "FAIL", startTime: 1999999000000, endTime: 1999999100000 }
+    ],
+    [
+      { pipelineRunId: 20, pipelineId: 2, status: "FAIL", startTime: 1999997000000, endTime: 1999997100000 }
+    ]
+  ];
+  let stdout = "";
+  const exitCode = await runCli(
+    ["pipeline", "failed-runs", "--hours", "24", "--end-time", "2000000000000", "--output", "json"],
+    {
+      YUNXIAO_TOKEN: "pt-test",
+      YUNXIAO_ORGANIZATION_ID: "org-1"
+    },
+    {
+      fetcher: async (url) => {
+        urls.push(String(url));
+        return new Response(JSON.stringify(responses.shift()), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      },
+      stdout: (text) => {
+        stdout += text;
+      },
+      stderr: () => {}
+    }
+  );
+
+  assert.equal(exitCode, 0);
+  assert.equal(urls.length, 3);
+  assert.equal(
+    urls[0],
+    "https://openapi-rdc.aliyuncs.com/oapi/v1/flow/organizations/org-1/pipelines?page=1&perPage=30&executeStartTime=1999913600000&executeEndTime=2000000000000&statusList=FAIL"
+  );
+  assert.match(urls[1], /\/pipelines\/1\/runs\?/);
+  assert.match(urls[2], /\/pipelines\/2\/runs\?/);
+  assert.deepEqual(
+    JSON.parse(stdout).map((row: Record<string, unknown>) => ({
+      pipelineId: row.pipelineId,
+      pipelineName: row.pipelineName,
+      pipelineRunId: row.pipelineRunId
+    })),
+    [
+      { pipelineId: 1, pipelineName: "后端流水线", pipelineRunId: 11 },
+      { pipelineId: 2, pipelineName: "前端流水线", pipelineRunId: 20 }
+    ]
+  );
+});
+
+test("pipeline retry-job requires confirmation", async () => {
+  let stderr = "";
+  const exitCode = await runCli(
+    ["pipeline", "retry-job", "123", "456", "789"],
+    {
+      YUNXIAO_TOKEN: "pt-test",
+      YUNXIAO_ORGANIZATION_ID: "org-1"
+    },
+    {
+      fetcher: async () => {
+        throw new Error("fetch should not be called");
+      },
+      stdout: () => {},
+      stderr: (text) => {
+        stderr += text;
+      }
+    }
+  );
+
+  assert.equal(exitCode, 1);
+  assert.match(stderr, /--yes/);
+});
+
+test("pipeline retry-job calls retry API when confirmed", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  let stdout = "";
+  const exitCode = await runCli(
+    ["pipeline", "retry-job", "123", "456", "789", "--yes", "--output", "json"],
+    {
+      YUNXIAO_TOKEN: "pt-test",
+      YUNXIAO_ORGANIZATION_ID: "org-1"
+    },
+    {
+      fetcher: async (url, init) => {
+        calls.push({ url: String(url), init });
+        return new Response(JSON.stringify(true), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      },
+      stdout: (text) => {
+        stdout += text;
+      },
+      stderr: () => {}
+    }
+  );
+
+  assert.equal(exitCode, 0);
+  assert.equal(calls[0].init?.method, "PUT");
+  assert.equal(
+    calls[0].url,
+    "https://openapi-rdc.aliyuncs.com/oapi/v1/flow/organizations/org-1/pipelines/123/pipelineRuns/456/jobs/789/retry"
+  );
+  assert.equal(JSON.parse(stdout), true);
+});

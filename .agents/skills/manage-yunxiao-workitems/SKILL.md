@@ -108,6 +108,37 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <us
 
 如果用户只给开始时间或结束时间，只追加对应参数。默认时间字段为 `gmtCreate`；如果用户要求按更新时间查询，追加 `--date-field gmtModified`。
 
+## 最近 1 个月所有成员待办明细
+
+当用户要求“所有成员最近 1 个月待办事项明细”“近一个月待办明细”时，执行所有成员待办查询，并追加最近 1 个月时间范围。默认按创建时间 `gmtCreate` 过滤；如果用户明确要求按更新时间或其他时间字段，再切换 `--date-field`。
+
+macOS/zsh 可用以下时间范围：
+
+```bash
+START="$(date -v-1m '+%Y-%m-%d 00:00:00')"
+END="$(date '+%Y-%m-%d 23:59:59')"
+```
+
+查询命令：
+
+```bash
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state todo --from "$START" --to "$END" --all-pages --output json
+```
+
+该场景属于“所有成员”查询，默认应用产品同事排除规则；除非用户明确要求包含产品同事。
+
+明细输出字段必须包含：
+
+- 任务编码：`serialNumber`
+- 标题：`subject`
+- 链接：优先使用返回数据中的 `detailUrl`、`webUrl` 或 `url`；如果接口未返回链接，用 `https://devops.aliyun.com/organization/<YUNXIAO_ORGANIZATION_ID>/projex/project/<space.id>/workitem/<id>` 生成链接，并在汇报中说明链接由工作项 ID 拼接。
+- 计划完成时间：优先读取直接字段 `dueDate`、`planFinishTime`、`plannedFinishTime`、`expectedFinishTime`；如果没有，查找 `customFieldValues` 中 `fieldName` 包含“计划完成”“截止”“到期”的字段。
+- 优先级：优先读取 `customFieldValues` 中 `fieldId` 为 `priority` 或 `fieldName` 为“优先级”的字段，取 `values[].displayValue`。
+- 创建时间：`gmtCreate`，转换成本地时间 `YYYY-MM-DD HH:mm:ss`。
+- 工作项类型：`workitemType.name`。
+
+输出优先使用 Markdown 表格；如果条目很多，先按负责人分组，再列每人的明细。
+
 ## 查询工作项动态与评论
 
 获取工作项动态及评论：

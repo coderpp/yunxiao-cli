@@ -2,6 +2,8 @@ import {
   YunxiaoClient,
   type Fetcher,
   type ListChangeRequestsOptions,
+  type ListLatestFailedPipelineRunsOptions,
+  type ListPipelineRunsOptions,
   type MergeChangeRequestOptions,
   type SearchProjectsOptions,
   type SearchWorkitemsOptions,
@@ -78,6 +80,9 @@ async function runCommand(
       return runProjectCommand(command, parsed, client);
     case "member":
       return runMemberCommand(command, parsed, client);
+    case "pipeline":
+    case "pl":
+      return runPipelineCommand(command, parsed, client);
     case "workitem":
     case "wi":
       return runWorkitemCommand(command, parsed, client, env);
@@ -184,6 +189,36 @@ async function runMemberCommand(command: string, parsed: ParsedArgs, client: Yun
       return client.getMember(requiredPositional(parsed.positionals[2], "memberId"));
     default:
       throw new Error(`Unknown member command: ${command}`);
+  }
+}
+
+async function runPipelineCommand(command: string, parsed: ParsedArgs, client: YunxiaoClient): Promise<unknown> {
+  if (command === "failed-runs" || command === "failed" || command === "latest-failed-runs") {
+    return client.listLatestFailedPipelineRuns(latestFailedPipelineRunsOptions(parsed.flags));
+  }
+
+  const pipelineId = requiredPositional(parsed.positionals[2], "pipelineId");
+  const pipelineRunId = parsed.positionals[3];
+  const jobId = parsed.positionals[4];
+
+  switch (command) {
+    case "runs":
+    case "list-runs":
+      return client.listPipelineRuns(pipelineId, pipelineRunsOptions(parsed.flags));
+    case "run":
+    case "get-run":
+    case "get":
+      return client.getPipelineRun(pipelineId, requiredPositional(pipelineRunId, "pipelineRunId"));
+    case "retry-job":
+    case "retry":
+      requireConfirmation(parsed.flags);
+      return client.retryPipelineJobRun(
+        pipelineId,
+        requiredPositional(pipelineRunId, "pipelineRunId"),
+        requiredPositional(jobId, "jobId")
+      );
+    default:
+      throw new Error(`Unknown pipeline command: ${command}`);
   }
 }
 
@@ -301,6 +336,26 @@ function projectSearchOptions(flags: Flags): SearchProjectsOptions {
     page: optionalNumber(flags.page) ?? 1,
     perPage: optionalNumber(flags["per-page"]) ?? 20,
     sort: optionalString(flags.sort) ?? "desc"
+  };
+}
+
+function pipelineRunsOptions(flags: Flags): ListPipelineRunsOptions {
+  return {
+    page: optionalNumber(flags.page),
+    perPage: optionalNumber(flags["per-page"]),
+    startTime: optionalNumber(flags["start-time"]),
+    endTime: optionalNumber(flags["end-time"]) ?? optionalNumber(flags["end-tme"]),
+    status: optionalString(flags.status),
+    triggerMode: optionalNumber(flags["trigger-mode"])
+  };
+}
+
+function latestFailedPipelineRunsOptions(flags: Flags): ListLatestFailedPipelineRunsOptions {
+  return {
+    hours: optionalNumber(flags.hours) ?? 24,
+    startTime: optionalNumber(flags["start-time"]),
+    endTime: optionalNumber(flags["end-time"]) ?? optionalNumber(flags["end-tme"]),
+    perPage: optionalNumber(flags["per-page"]) ?? 30
   };
 }
 
@@ -510,6 +565,9 @@ function formatTable(rows: unknown[]): string {
 
   const normalizedRows = rows.map((row) => (isRecord(row) ? row : { value: row }));
   const preferredKeys = [
+    "pipelineName",
+    "pipelineRunId",
+    "pipelineId",
     "localId",
     "projectId",
     "queryProjectId",
@@ -520,6 +578,13 @@ function formatTable(rows: unknown[]): string {
     "title",
     "state",
     "status",
+    "triggerMode",
+    "triggerModeName",
+    "startTime",
+    "startTimeText",
+    "endTime",
+    "endTimeText",
+    "createTime",
     "assignedTo",
     "userId",
     "userName",
@@ -795,6 +860,10 @@ Usage:
   yunxiao project member-remove <projectId> --user-ids user1,user2 [--role-id project.participant] --yes
   yunxiao member list [--page 1] [--per-page 100] [--output table|json]
   yunxiao member get <memberId> [--output table|json]
+  yunxiao pipeline failed-runs [--hours 24] [--output table|json]
+  yunxiao pipeline runs <pipelineId> [--status FAIL] [--start-time 1729178040000] [--end-time 1729181640000] [--output table|json]
+  yunxiao pipeline run <pipelineId> <pipelineRunId> [--output table|json]
+  yunxiao pipeline retry-job <pipelineId> <pipelineRunId> <jobId> --yes [--output table|json]
   yunxiao workitem list --project-ids p1,p2 [--assigned-to userId] [--state todo|doing|done] [--from "2026-04-01 00:00:00"] [--to "2026-04-30 23:59:59"]
   yunxiao workitem mine --project-ids p1,p2 [--state todo|doing|done] [--output table|json]
   yunxiao workitem get <workitemId> [--output table|json]
