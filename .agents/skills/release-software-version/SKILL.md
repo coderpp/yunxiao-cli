@@ -9,6 +9,20 @@ description: Use when a technical lead wants to publish a product version by cre
 
 帮助技术负责人快速发布产品版本，自动创建发布合并请求，并按用户要求决定是否自动评审和合并。
 
+## 运行前置：加载 `.env`
+
+所有云效 CLI 命令运行前，必须先在 `yunxiao-cli` 仓库根目录加载 `.env`，且加载动作必须和实际命令在同一个 shell 中；如果每次用新的 shell 调用，就每次都重新加载。
+
+```bash
+cd /Users/pp/repos/yunxiao-cli
+set -a
+source .env
+set +a
+npx --yes --package @coderpp/yunxiao-cli yunxiao <command>
+```
+
+`.env` 不存在、加载失败或必要的 `YUNXIAO_*` 环境变量缺失时，停止并提示用户。不要打印 `.env` 内容、token 或其他密钥。
+
 ## 固定命令前缀
 
 所有命令都必须用 npx 方式运行：

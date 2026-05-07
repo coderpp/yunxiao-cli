@@ -9,6 +9,20 @@ description: Use when a technical lead wants to query or update Yunxiao project 
 
 帮助技术负责人快速查看待办、进行中、已完成工作项，调整工作项负责人/参与人/计划完成时间，维护项目成员，并补充工作项评论。
 
+## 运行前置：加载 `.env`
+
+所有云效 CLI 命令运行前，必须先在 `yunxiao-cli` 仓库根目录加载 `.env`，且加载动作必须和实际命令在同一个 shell 中；如果每次用新的 shell 调用，就每次都重新加载。
+
+```bash
+cd /Users/pp/repos/yunxiao-cli
+set -a
+source .env
+set +a
+npx --yes --package @coderpp/yunxiao-cli yunxiao <command>
+```
+
+`.env` 不存在、加载失败或必要的 `YUNXIAO_*` 环境变量缺失时，停止并提示用户。不要打印 `.env` 内容、token 或其他密钥。
+
 ## 固定命令前缀
 
 默认用 npx 方式运行：
@@ -131,7 +145,7 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state todo --fr
 
 - 任务编码：`serialNumber`
 - 标题：`subject`
-- 链接：优先使用返回数据中的 `detailUrl`、`webUrl` 或 `url`；如果接口未返回链接，用 `https://devops.aliyun.com/organization/<YUNXIAO_ORGANIZATION_ID>/projex/project/<space.id>/workitem/<id>` 生成链接，并在汇报中说明链接由工作项 ID 拼接。
+- 链接：优先使用返回数据中的 `detailUrl`、`webUrl` 或 `url`；如果接口未返回链接，用 `https://devops.aliyun.com/projex/project/<space.id>/<category-route>/<id>` 生成链接，并在汇报中说明链接由工作项 ID 拼接。`category-route` 按 `categoryId` 映射：`Req` → `req`，`Task` → `task`，`Bug` → `bug`，其他值使用小写形式。
 - 计划完成时间：优先读取直接字段 `dueDate`、`planFinishTime`、`plannedFinishTime`、`expectedFinishTime`；如果没有，查找 `customFieldValues` 中 `fieldName` 包含“计划完成”“截止”“到期”的字段。
 - 优先级：优先读取 `customFieldValues` 中 `fieldId` 为 `priority` 或 `fieldName` 为“优先级”的字段，取 `values[].displayValue`。
 - 创建时间：`gmtCreate`，转换成本地时间 `YYYY-MM-DD HH:mm:ss`。
