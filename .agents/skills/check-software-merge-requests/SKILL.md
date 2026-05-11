@@ -11,10 +11,9 @@ description: Use when a technical lead wants to inspect, approve, and merge open
 
 ## 运行前置：加载 `.env`
 
-所有云效 CLI 命令运行前，必须先在 `yunxiao-cli` 仓库根目录加载 `.env`，且加载动作必须和实际命令在同一个 shell 中；如果每次用新的 shell 调用，就每次都重新加载。
+所有云效 CLI 命令运行前，必须先在根目录加载 `.env`，且加载动作必须和实际命令在同一个 shell 中；如果每次用新的 shell 调用，就每次都重新加载。
 
 ```bash
-cd /Users/pp/repos/yunxiao-cli
 set -a
 source .env
 set +a
