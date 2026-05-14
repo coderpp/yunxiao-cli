@@ -11,16 +11,32 @@ description: Use when a technical lead wants to publish a product version by cre
 
 ## 运行前置：加载 `.env`
 
-所有云效 CLI 命令运行前，必须先在根目录加载 `.env`，且加载动作必须和实际命令在同一个 shell 中；如果每次用新的 shell 调用，就每次都重新加载。
+所有云效 CLI 命令运行前，必须先加载运行环境，且加载动作必须和实际命令在同一个 shell 中；如果每次用新的 shell 调用，就每次都重新加载。
+
+按以下顺序尝试加载，先命中的文件即可：
+
+1. 仓库根目录 `.env`
+2. 用户根目录 `~/.env`
+3. 用户根目录 `~/.zshrc`
 
 ```bash
 set -a
-source .env
+if [ -f .env ]; then
+  source .env || { set +a; exit 1; }
+elif [ -f "${HOME}/.env" ]; then
+  source "${HOME}/.env" || { set +a; exit 1; }
+elif [ -f "${HOME}/.zshrc" ]; then
+  source "${HOME}/.zshrc" || { set +a; exit 1; }
+else
+  set +a
+  echo "未找到 .env、${HOME}/.env 或 ${HOME}/.zshrc" >&2
+  exit 1
+fi
 set +a
 npx --yes --package @coderpp/yunxiao-cli yunxiao <command>
 ```
 
-`.env` 不存在、加载失败或必要的 `YUNXIAO_*` 环境变量缺失时，停止并提示用户。不要打印 `.env` 内容、token 或其他密钥。
+以上文件均不存在、加载失败或必要的 `YUNXIAO_*` 环境变量缺失时，停止并提示用户。不要打印 `.env`、`.zshrc` 内容、token 或其他密钥。
 
 ## 固定命令前缀
 

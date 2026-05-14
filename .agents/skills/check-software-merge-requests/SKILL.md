@@ -11,16 +11,32 @@ description: Use when a technical lead wants to inspect, approve, and merge open
 
 ## 运行前置：加载 `.env`
 
-所有云效 CLI 命令运行前，必须先在根目录加载 `.env`，且加载动作必须和实际命令在同一个 shell 中；如果每次用新的 shell 调用，就每次都重新加载。
+所有云效 CLI 命令运行前，必须先加载运行环境，且加载动作必须和实际命令在同一个 shell 中；如果每次用新的 shell 调用，就每次都重新加载。
+
+按以下顺序尝试加载，先命中的文件即可：
+
+1. 仓库根目录 `.env`
+2. 用户根目录 `~/.env`
+3. 用户根目录 `~/.zshrc`
 
 ```bash
 set -a
-source .env
+if [ -f .env ]; then
+  source .env || { set +a; exit 1; }
+elif [ -f "${HOME}/.env" ]; then
+  source "${HOME}/.env" || { set +a; exit 1; }
+elif [ -f "${HOME}/.zshrc" ]; then
+  source "${HOME}/.zshrc" || { set +a; exit 1; }
+else
+  set +a
+  echo "未找到 .env、${HOME}/.env 或 ${HOME}/.zshrc" >&2
+  exit 1
+fi
 set +a
 npx --yes --package @coderpp/yunxiao-cli yunxiao <command>
 ```
 
-`.env` 不存在、加载失败或必要的 `YUNXIAO_*` 环境变量缺失时，停止并提示用户。不要打印 `.env` 内容、token 或其他密钥。
+以上文件均不存在、加载失败或必要的 `YUNXIAO_*` 环境变量缺失时，停止并提示用户。不要打印 `.env`、`.zshrc` 内容、token 或其他密钥。
 
 ## 固定命令前缀
 
@@ -38,6 +54,19 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao
 - `syjc-web`
 
 当用户要求“查看待合并请求”“合并所有请求”“处理全部请求”时，只处理以上仓库，忽略其他仓库的合并请求。
+
+## 默认可合并提交人
+
+以下同事提交的合并请求，在满足默认仓库范围或用户明确指定白名单外范围的前提下，可以默认评审通过并合并：
+
+- 张人文
+- 丁琪
+- 廖海波
+- 彭娜娜
+
+其他提交人提交的请求，或无法从列表输出中确认提交人的请求，必须先列出并向用户二次确认；得到明确确认前，不要执行评审或合并命令。
+
+识别提交人时优先使用合并请求 JSON 中表示提交人或创建人的字段，例如 `creator`、`author`、`createdBy`、`submitter`、`createdByName`、`authorName`，并读取其中的 `name`、`displayName`、`userName`、`username` 或字符串值。不要用评审人、合并人、最后更新人代替提交人。提交人姓名需要与上方名单准确匹配；无法准确匹配时按“需要二次确认”处理。
 
 ## 白名单外例外
 
@@ -69,23 +98,32 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao mr list --state opened --output
 - 用户单独指定白名单外请求：从结果中定位该指定请求。
 - 用户明确要求白名单外全部请求：筛选仓库不属于 `syjc-boot`、`syjc-web` 的请求。
 
-3. 根据用户要求处理：
+3. 识别每个待处理请求的提交人，并拆分处理范围：
+
+- 默认可合并：提交人是张人文、丁琪、廖海波、彭娜娜。
+- 需要二次确认：提交人不是上述名单成员，或提交人无法确认。
+- 如果用户只要求查看，仍然列出提交人和是否需要确认，但不执行任何评审或合并命令。
+- 如果用户要求合并，默认只对“默认可合并”的请求执行合并；“需要二次确认”的请求先列出并询问用户是否继续。
+- 用户确认名单外提交人的请求后，只处理用户明确确认的请求，不要顺带合并其他仍未确认的请求。
+
+4. 根据用户要求处理：
 
 - 如果用户只要求“查看”“看下”“不合并”，只汇报待合并请求，不执行任何评审或合并命令。
 - 如果用户指定某个请求，只处理指定请求；指定请求可以来自白名单外仓库。
 - 如果用户要求处理所有请求，只处理白名单仓库中的所有请求。
 - 如果用户明确要求处理白名单外所有请求，只处理白名单外仓库中的所有请求。
 
-4. 对每个要处理的请求执行评审通过并合并，默认删除源分支：
+5. 对每个已允许合并的请求执行评审通过并合并，默认删除源分支：
 
 ```bash
 npx --yes --package @coderpp/yunxiao-cli yunxiao mr approve-and-merge <repositoryId> <localId> --yes --remove-source-branch --output json
 ```
 
-5. 汇报合并结果，至少包含：
+6. 汇报合并结果，至少包含：
 
 - 如果只是查看：列出待处理请求，明确说明未执行合并。
 - 已合并请求列表：仓库、合并请求 ID、标题或源/目标分支。
+- 已跳过并等待二次确认的请求列表：仓库、合并请求 ID、标题、提交人。
 - 已忽略请求列表：说明因为仓库不在白名单而忽略。
 - 白名单外请求：说明这是用户明确要求后处理的请求，并列出处理范围。
 - 失败或停止原因。
@@ -98,6 +136,7 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao mr approve-and-merge <repositor
 - 待处理请求的仓库无法确认是否属于默认范围，且用户没有单独明确指定该请求。
 - 用户要求和检测到的请求不一致，例如指定请求不存在。
 - 用户对白名单外单个请求的描述无法唯一定位到一个合并请求。
+- 准备对非默认可合并提交人的请求执行评审或合并命令，但用户尚未二次确认。
 - 命令输出中出现异常状态或错误信息。
 
 ## 注意
@@ -106,4 +145,5 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao mr approve-and-merge <repositor
 - 合并操作默认带 `--remove-source-branch`。
 - 不要在“全部合并”这类批量操作中合并 `syjc-boot`、`syjc-web` 之外的任何仓库。
 - 只有用户明确指定白名单外请求或明确要求合并白名单外全部请求时，才允许合并白名单外仓库。
+- 默认可合并提交人规则只决定是否需要二次确认，不扩大默认仓库范围。
 - 不要在异常后自行重试破坏性操作；先汇报并询问用户。
