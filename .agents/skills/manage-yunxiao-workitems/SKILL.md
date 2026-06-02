@@ -91,25 +91,30 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao member list --per-page 100 --ou
 
 ## 查询工作项
 
+待办口径：用户说“待办”“待处理”“未完成”“待办事项”时，默认包含状态为 `todo` 和 `doing` 的工作项；也就是“进行中”已算作待办。只有用户明确要求“仅 todo”“只看未开始/待处理状态”时，才只查询 `--state todo`。
+
 当前用户待办工作项：
 
 ```bash
 npx --yes --package @coderpp/yunxiao-cli yunxiao workitem mine --state todo --all-pages --output json
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem mine --state doing --all-pages --output json
 ```
 
 指定成员待办工作项：
 
 ```bash
 npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <userId> --state todo --all-pages --output json
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <userId> --state doing --all-pages --output json
 ```
 
 所有成员待办工作项：
 
 ```bash
 npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state todo --all-pages --output json
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state doing --all-pages --output json
 ```
 
-查询结果中排除产品同事后再汇总和汇报。
+将 `todo` 和 `doing` 两批结果合并后再汇总和汇报；如有重复，按工作项 `id` 去重。该场景属于“所有成员”查询，默认应用产品同事排除规则；除非用户明确要求包含产品同事。
 
 所有或指定成员进行中的工作项：
 
@@ -139,7 +144,7 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <us
 
 ## 最近 1 个月所有成员待办明细
 
-当用户要求“所有成员最近 1 个月待办事项明细”“近一个月待办明细”时，执行所有成员待办查询，并追加最近 1 个月时间范围。默认按创建时间 `gmtCreate` 过滤；如果用户明确要求按更新时间或其他时间字段，再切换 `--date-field`。
+当用户要求“所有成员最近 1 个月待办事项明细”“近一个月待办明细”时，执行所有成员待办查询；待办包含 `todo` 和 `doing`，两批结果合并去重后输出，并追加最近 1 个月时间范围。默认按创建时间 `gmtCreate` 过滤；如果用户明确要求按更新时间或其他时间字段，再切换 `--date-field`。
 
 macOS/zsh 可用以下时间范围：
 
@@ -152,6 +157,7 @@ END="$(date '+%Y-%m-%d 23:59:59')"
 
 ```bash
 npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state todo --from "$START" --to "$END" --all-pages --output json
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state doing --from "$START" --to "$END" --all-pages --output json
 ```
 
 该场景属于“所有成员”查询，默认应用产品同事排除规则；除非用户明确要求包含产品同事。
@@ -165,6 +171,7 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state todo --fr
 - 优先级：优先读取 `customFieldValues` 中 `fieldId` 为 `priority` 或 `fieldName` 为“优先级”的字段，取 `values[].displayValue`。
 - 创建时间：`gmtCreate`，转换成本地时间 `YYYY-MM-DD HH:mm:ss`。
 - 工作项类型：`workitemType.name`。
+- 状态：从工作项状态字段读取；用于区分 `todo` 和 `doing`。
 
 输出优先使用 Markdown 表格；如果条目很多，先按负责人分组，再列每人的明细。
 
