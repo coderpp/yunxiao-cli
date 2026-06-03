@@ -361,6 +361,14 @@ node dist/src/index.js workitem list --project-ids project-id-1,project-id-2 --a
 node dist/src/index.js workitem list --project-ids project-id-1,project-id-2 --assigned-to user-id --state done
 ```
 
+按创建人查询工作项：
+
+```bash
+node dist/src/index.js workitem list --project-ids project-id-1,project-id-2 --created-by user-id
+```
+
+`--created-by` 支持逗号分隔多个用户 ID，也可以使用等价参数 `--creator`。
+
 按时间范围查询工作项：
 
 ```bash

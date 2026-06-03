@@ -436,6 +436,42 @@ test("workitem mine searches configured projects and filters todo state", async 
   ]);
 });
 
+test("workitem list filters by creator", async () => {
+  let body: Record<string, unknown> | undefined;
+
+  const exitCode = await runCli(
+    ["workitem", "list", "--project-ids", "project-1", "--created-by", "creator-1,creator-2", "--output", "json"],
+    {
+      YUNXIAO_TOKEN: "pt-test",
+      YUNXIAO_ORGANIZATION_ID: "org-1"
+    },
+    {
+      fetcher: async (_url, init) => {
+        body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      },
+      stdout: () => {},
+      stderr: () => {}
+    }
+  );
+
+  assert.equal(exitCode, 0);
+  assert.deepEqual(body, {
+    category: "Req,Task,Bug",
+    conditions:
+      '{"conditionGroups":[[{"fieldIdentifier":"creator","operator":"CONTAINS","value":["creator-1","creator-2"],"toValue":null,"className":"user","format":"list"}]]}',
+    orderBy: "gmtCreate",
+    page: 1,
+    perPage: 20,
+    sort: "desc",
+    spaceId: "project-1",
+    spaceType: "Project"
+  });
+});
+
 test("workitem update supports assigned user, participants, due date, and custom fields", async () => {
   let body: unknown;
   const exitCode = await runCli(

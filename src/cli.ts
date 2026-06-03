@@ -405,7 +405,7 @@ function workitemConditions(flags: Flags): string | undefined {
   const rawConditions = optionalString(flags.conditions);
   const filters: Array<Record<string, unknown>> = [];
   const assignedTo = optionalString(flags["assigned-to"]) ?? optionalString(flags.assignee);
-  const creator = optionalString(flags.creator);
+  const creator = optionalString(flags["created-by"]) ?? optionalString(flags.creator);
   const statusIds = optionalString(flags["status-ids"]);
   const subject = optionalString(flags.subject);
   const from = optionalString(flags.from) ?? optionalString(flags["created-after"]);
@@ -585,7 +585,10 @@ function formatTable(rows: unknown[]): string {
     "endTime",
     "endTimeText",
     "createTime",
+    "gmtCreate",
     "assignedTo",
+    "creator",
+    "createdBy",
     "userId",
     "userName",
     "roleName",
@@ -864,7 +867,7 @@ Usage:
   yunxiao pipeline runs <pipelineId> [--status FAIL] [--start-time 1729178040000] [--end-time 1729181640000] [--output table|json]
   yunxiao pipeline run <pipelineId> <pipelineRunId> [--output table|json]
   yunxiao pipeline retry-job <pipelineId> <pipelineRunId> <jobId> --yes [--output table|json]
-  yunxiao workitem list --project-ids p1,p2 [--assigned-to userId] [--state todo|doing|done] [--from "2026-04-01 00:00:00"] [--to "2026-04-30 23:59:59"]
+  yunxiao workitem list --project-ids p1,p2 [--assigned-to userId] [--created-by userId] [--state todo|doing|done] [--from "2026-04-01 00:00:00"] [--to "2026-04-30 23:59:59"]
   yunxiao workitem mine --project-ids p1,p2 [--state todo|doing|done] [--output table|json]
   yunxiao workitem get <workitemId> [--output table|json]
   yunxiao workitem update <workitemId> --yes [--assigned-to userId] [--participants user1,user2] [--due-date "2026-05-01 18:00:00"] [--field key=value]

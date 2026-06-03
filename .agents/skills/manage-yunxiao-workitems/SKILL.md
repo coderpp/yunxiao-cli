@@ -112,6 +112,14 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <us
 npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <userId> --state doing --all-pages --output json
 ```
 
+指定创建人工作项：
+
+```bash
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --created-by <userId> --all-pages --output json
+```
+
+`--created-by` 支持逗号分隔多个用户 ID，也可以使用等价参数 `--creator`。可按需追加 `--state`、`--from`、`--to` 等查询过滤。
+
 所有成员待办工作项：
 
 ```bash
