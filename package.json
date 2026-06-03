@@ -1,6 +1,6 @@
 {
   "name": "@coderpp/yunxiao-cli",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "A CLI for Yunxiao merge request, pipeline retry, project member, and workitem workflows.",
   "type": "module",
   "repository": {
