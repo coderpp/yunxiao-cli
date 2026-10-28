@@ -149,7 +149,7 @@ test("invalid output option exits with error", async () => {
     }
   );
 
-  assert.equal(exitCode, 1);
+  assert.equal(exitCode, 2);
   assert.match(stderr, /Invalid --output/);
 });
 
@@ -172,7 +172,7 @@ test("merge command refuses without confirmation", async () => {
     }
   );
 
-  assert.equal(exitCode, 1);
+  assert.equal(exitCode, 2);
   assert.match(stderr, /--yes/);
 });
 
@@ -235,10 +235,13 @@ test("release command creates, approves, and merges using repository name", asyn
   const urls: string[] = [];
   const bodies: unknown[] = [];
   const responses = [
-    { id: "user-1", name: "Release Owner" },
     [{ id: 2813489, name: "yunxiao-cli", path: "yunxiao-cli" }],
+    [],
+    { id: "user-1", name: "Release Owner" },
     { localId: 17, projectId: 2813489, title: "Release release/1.2.3 into master" },
+    [{ patchSetBizId: "patch-1", commitId: "sha-1", relatedMergeItemType: "MERGE_SOURCE", versionNo: 1 }],
     { result: true },
+    [{ patchSetBizId: "patch-1", commitId: "sha-1", relatedMergeItemType: "MERGE_SOURCE", versionNo: 1 }],
     { status: "MERGED" }
   ];
   let stdout = "";
@@ -267,11 +270,11 @@ test("release command creates, approves, and merges using repository name", asyn
   );
 
   assert.equal(exitCode, 0);
-  assert.match(urls[0], /\/platform\/user$/);
-  assert.match(urls[1], /\/repositories\?page=1&perPage=20&search=yunxiao-cli&archived=false$/);
-  assert.match(urls[2], /\/repositories\/2813489\/changeRequests$/);
-  assert.match(urls[3], /\/review$/);
-  assert.match(urls[4], /\/merge$/);
+  assert.match(urls[2], /\/platform\/user$/);
+  assert.match(urls[0], /\/repositories\?page=1&perPage=20&search=yunxiao-cli&archived=false$/);
+  assert.match(urls[3], /\/repositories\/2813489\/changeRequests$/);
+  assert.match(urls[5], /\/review$/);
+  assert.match(urls[7], /\/merge$/);
   assert.deepEqual(bodies[0], {
     createFrom: "WEB",
     reviewerUserIds: ["user-1"],
@@ -292,8 +295,9 @@ test("release command creates, approves, and merges using repository name", asyn
 test("release command supports create-only mode", async () => {
   const urls: string[] = [];
   const responses = [
-    { id: "user-1", name: "Release Owner" },
     [{ id: 2813489, name: "yunxiao-cli", path: "yunxiao-cli" }],
+    [],
+    { id: "user-1", name: "Release Owner" },
     { localId: 18, projectId: 2813489, title: "Release release/1.2.3 into master" }
   ];
   let stdout = "";
@@ -319,8 +323,8 @@ test("release command supports create-only mode", async () => {
   );
 
   assert.equal(exitCode, 0);
-  assert.equal(urls.length, 3);
-  assert.match(urls[2], /\/repositories\/2813489\/changeRequests$/);
+  assert.equal(urls.length, 4);
+  assert.match(urls[3], /\/repositories\/2813489\/changeRequests$/);
   const result = JSON.parse(stdout);
   assert.equal(result.changeRequest.localId, 18);
   assert.equal(result.review, null);
@@ -558,7 +562,7 @@ test("pipeline runs command sends list filters and prints JSON", async () => {
   assert.equal(exitCode, 0);
   assert.equal(
     urls[0],
-    "https://openapi-rdc.aliyuncs.com/oapi/v1/flow/organizations/org-1/pipelines/123/runs?startTime=1729178040000&endTme=1729181640000&status=FAIL&triggerMode=3"
+    "https://openapi-rdc.aliyuncs.com/oapi/v1/flow/organizations/org-1/pipelines/123/runs?page=1&perPage=20&startTime=1729178040000&endTme=1729181640000&status=FAIL&triggerMode=3"
   );
   assert.deepEqual(JSON.parse(stdout), [{ pipelineRunId: 456, pipelineId: 123, status: "FAIL" }]);
 });
@@ -640,7 +644,7 @@ test("pipeline retry-job requires confirmation", async () => {
     }
   );
 
-  assert.equal(exitCode, 1);
+  assert.equal(exitCode, 2);
   assert.match(stderr, /--yes/);
 });
 

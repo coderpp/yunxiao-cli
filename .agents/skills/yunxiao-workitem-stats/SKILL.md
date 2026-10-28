@@ -217,3 +217,7 @@ https://devops.aliyun.com/projex/project/<space.id>/<category-route>/<id>
 4. 排除产品同事，按人员分组
 5. 生成文档到 `outputs/工作项统计/`
 6. 展示统计摘要
+
+## 分页与错误检查
+
+工作项统计必须使用 `--all-pages`。新版 CLI 遇到重复页或中途失败会返回非零退出码，不输出部分聚合结果；不得把错误输出或单页空结果计为零工作项。查询结果 stdout 与 stderr 提示分开处理。

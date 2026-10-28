@@ -145,3 +145,13 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao mr release syjc-web master rele
 - 被跳过的仓库和跳过原因。
 - 是否使用了 `--create-only`。
 - 如果失败，说明失败仓库、失败步骤和错误信息。
+
+## 发布恢复（CLI >= 0.2.0）
+
+包含恢复功能的 CLI 在发现相同分支的已有 MR 时返回 `EXISTING_MR`，不要反复创建。核对返回的 MR 与当前发布任务一致后，在既有发布授权范围内使用：
+
+```bash
+npx --yes --package @coderpp/yunxiao-cli yunxiao mr release <repositoryName> <sourceBranch> <targetBranch> --resume <localId> --yes --output json --error-format json
+```
+
+`status=skipped` 表示明确无差异，`already-merged` 表示已合并。退出码 7 表示部分完成或写入结果未知，读取错误中的 `completed`、`failedStage`、`resumeArgs` 及服务端状态后再处理。不要把其他错误作为无差异跳过。这些命令要求 @coderpp/yunxiao-cli >= 0.2.0。

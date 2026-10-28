@@ -60,7 +60,7 @@ test("invalid links and out-of-scope projects fail before fetching",async()=>{
   for (const url of ["https://example.com/projex/project/p/req/id", "https://devops.aliyun.com/projex/project/p", "https://devops.aliyun.com/projex/project/p/req/.."]) assert.throws(()=>parseWorkitemUrl(url));
   let error="";
   const exit=await runCli(["workitem","content",link],{YUNXIAO_TOKEN:"test",YUNXIAO_ORGANIZATION_ID:"org",YUNXIAO_PROJECT_IDS:"other"},{stderr:s=>{error+=s;},fetcher:async()=>{throw new Error("must not fetch");}});
-  assert.equal(exit,1); assert.match(error,/project scope/);
+  assert.equal(exit,2); assert.match(error,/project scope/);
 });
 test("failed streams leave no partial file and do not expose signed URLs",async()=>{
   const dir=await mkdtemp(path.join(tmpdir(),"yunxiao-failure-"));

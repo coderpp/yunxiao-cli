@@ -147,3 +147,16 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao mr approve-and-merge <repositor
 - 只有用户明确指定白名单外请求或明确要求合并白名单外全部请求时，才允许合并白名单外仓库。
 - 默认可合并提交人规则只决定是否需要二次确认，不扩大默认仓库范围。
 - 不要在异常后自行重试破坏性操作；先汇报并询问用户。
+
+## CLI 补充能力
+
+下列示例要求 @coderpp/yunxiao-cli >= 0.2.0。仍遵循上述范围、评审及授权规则。
+
+```bash
+npx --yes --package @coderpp/yunxiao-cli yunxiao mr list --state opened --all-pages --output json
+npx --yes --package @coderpp/yunxiao-cli yunxiao mr get <repositoryId> <localId> --output json
+npx --yes --package @coderpp/yunxiao-cli yunxiao mr diff <repositoryId> <localId> --from-patch-set-id <targetPatchId> --to-patch-set-id <sourcePatchId> --output json
+npx --yes --package @coderpp/yunxiao-cli yunxiao mr comments <repositoryId> <localId> --output json
+```
+
+检查 diff 的 `complete` 和逐文件原因；不完整内容不能作为完整评审证据。按固定版本复核，不依赖移动分支。评论和评审是独立操作；仅在获得发评论授权时使用 `mr comment --content-file <file> --yes`。拒绝评审可用 `mr review --opinion not-pass --comment-file <file>`。

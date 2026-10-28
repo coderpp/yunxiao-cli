@@ -130,3 +130,12 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao pipeline run <pipelineId> <pipe
 - 每个任务的重试结果。
 - 重试后运行实例状态，例如 `RUNNING`、`SUCCESS` 或 `FAIL`。
 - 如果失败，附上关键错误信息和 requestId。
+
+## 任务及日志查询（CLI >= 0.2.0）
+
+```bash
+npx --yes --package @coderpp/yunxiao-cli yunxiao pipeline jobs <pipelineId> <pipelineRunId> --output json
+npx --yes --package @coderpp/yunxiao-cli yunxiao pipeline logs <pipelineId> <pipelineRunId> <jobId> --output json
+```
+
+日志是单次快照，检查 `more` 判断是否可能还有内容。重试返回未知写入结果时，先查运行状态，避免重复执行。新增的 `pipeline start`、`pipeline cancel` 不属于“重试失败任务”的默认授权范围。这些命令要求 @coderpp/yunxiao-cli >= 0.2.0。

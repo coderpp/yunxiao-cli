@@ -15,11 +15,11 @@ npm run build
 node dist/src/index.js --help
 ```
 
-如果后续发布为 npm 包，安装后可直接使用 `yunxiao` 命令。
+安装 npm 包后可直接使用 `yunxiao` 命令。
 
 ## 通过 npx 使用
 
-发布到 npm 后，可以直接用 `npx` 执行：
+可以直接用 `npx` 执行：
 
 ```bash
 npx @coderpp/yunxiao-cli mr list --state opened
@@ -453,3 +453,163 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao workitem attachments <workitemI
 已有文件不覆盖，重复读取请选择新目录；失败返回非零退出码，清理未完成文件并保留已完成文件。
 仅支持带 `fileIdentifier` 的云效图片（PNG/JPEG/GIF/WebP/BMP/ICO）；外部图片和 data URL 会报错。
 需要工作项、评论、附件只读权限。完整内容不递归包含关联工作项或历史动态。
+
+## 0.2.0 新增能力
+
+以下命令与错误契约要求 `@coderpp/yunxiao-cli >= 0.2.0`。
+
+## 完整查询与可靠请求
+
+分页接口统一支持 `--page`、`--per-page`（1–100）、`--all-pages`：
+
+```bash
+yunxiao mr list --state opened --all-pages --output json
+yunxiao project list --all-pages
+yunxiao member list --all-pages
+yunxiao pipeline list --name 发布 --all-pages
+yunxiao pipeline runs 123 --all-pages
+yunxiao workitem mine --all-pages
+```
+
+默认每页 20 条；`pipeline failed-runs` 保持内部全量扫描和默认每页 30 条。
+工作项按项目分别分页后再过滤状态。没有使用 `--all-pages` 的状态查询会提示结果范围。
+分页优先采用响应头的下一页和实际页大小；无分页元信息时根据返回条数判断。
+重复页、分页中断或保护上限触发时返回非零退出码，不输出不完整的聚合结果。
+`project members`、工作项评论等无分页接口直接返回完整 API 响应，不接受分页选项。
+
+API 请求默认 `--timeout-ms 30000 --retries 2`。超时覆盖响应体读取；文件下载也使用该超时，失败清理未完成文件。
+仅只读操作会在网络临时错误、429、502/503/504 时退避重试，包括工作项/项目搜索和 MR 评论查询这些只读 POST。
+遵循 `Retry-After`；要求等待超过 60 秒时返回限流错误，由调用方稍后重试。
+写操作不自动重放，网络错误、超时或服务端 5xx 可能返回“写入结果未知”，应先查服务端状态。
+文件下载保留单次读取行为，不自动重试。
+
+未知参数、缺值、重复的非集合参数、额外位置参数、非法枚举和数值会报错。
+`--field` 可重复；`--key=a=b` 会完整保留 `a=b`。布尔参数支持 `--yes=false` 等写法。
+`--version` 和 `yunxiao mr diff --help` 等子命令帮助不需要 Token。
+原有 `pl`、`wi` 和命令别名继续支持，输出与主命令一致。
+
+## MR 详情、差异与评论
+
+```bash
+yunxiao mr get 2813489 12 --output json
+yunxiao mr diff 2813489 12 --output json
+yunxiao mr diff 2813489 12 --file src/example.ts --output text
+yunxiao mr diff 2813489 12 --from-patch-set-id target-id --to-patch-set-id source-id --output json
+yunxiao mr comments 2813489 12 --resolved=false --output json
+yunxiao mr comments 2813489 12 --comment-type INLINE_COMMENT --file src/example.ts
+
+yunxiao mr comment 2813489 12 --content-file ./review.md --yes
+yunxiao mr comment 2813489 12 --parent-id comment-id --content "已处理，请复核" --yes
+yunxiao mr comment 2813489 12 --file src/example.ts --line 42 --side new \
+  --from-patch-set-id target-id --to-patch-set-id source-id --content "这里需要处理空值" --yes
+```
+
+`mr diff` 从 MR 版本列表解析并固定版本 ID、提交 SHA；默认取最新目标和源版本。
+使用固定 SHA 调用代码比较 API（目标到源使用 merge-base；源版本之间使用直接比较），并与相同版本对的 MR 文件树核对文件对象 ID、数量及增删行数。
+响应包含版本 ID、SHA、`complete` 和逐文件原因；二进制、缺失、截断或比较不一致时标记不完整。
+这是完整性核对而非绕过服务端 diff 限额；跨库提交不可访问时会保留服务端错误。
+`--output text` 可直接读取 diff，但机器验收应检查 JSON 的 `complete`；成功读取不等同于内容完整。
+
+行内评论必须指定文件、正整数行号、`--side old|new` 和 `--to-patch-set-id`；未指定起始版本时解析最新目标版本。
+两端版本必须属于该 MR，文件必须存在于对应侧的变更树；服务端继续校验实际评论行位置。
+普通评论默认绑定最新源版本，也可用 `--to-patch-set-id` 固定版本。
+评论支持 `--parent-id` 回复，默认直接发表、未解决。评论编辑、删除、解决状态操作不在本轮范围。
+
+## 通用 MR 管理与发布恢复
+
+```bash
+yunxiao mr create 2813489 --source feature/demo --target master --title "功能说明" \
+  --description-file ./mr.md --reviewers user-1,user-2 --yes
+yunxiao mr update 2813489 12 --title "更新标题" --description-file ./mr.md --yes
+yunxiao mr update 2813489 12 --description= --yes
+yunxiao mr close 2813489 12 --yes
+yunxiao mr review 2813489 12 --opinion not-pass --comment-file ./review.md
+yunxiao mr release example-web master release --resume 12 --yes --output json
+```
+
+`mr create` 只创建；默认同仓库，可用 `--source-project-id` 指定源库。
+`mr review` 默认 `--opinion pass`，保留已有调用方式。
+新建、修改、关闭、评论、流水线启动和取消等新写命令都需要 `--yes`。
+
+发布按以下规则执行：
+
+- 仓库查询完整分页并精确匹配；同名歧义需要完整命名空间路径。
+- 创建前查找相同源/目标库及分支的未关闭 MR；发现已有 MR 返回错误、链接和显式恢复参数，避免自动接管。
+- `--resume` 校验 MR 的库及分支；已合并返回 `already-merged`，已关闭拒绝执行。
+- 仅在服务端能证明当前用户已于当前版本创建后评审通过时跳过评审，否则重新评审当前版本；评审前后核对源版本，变化时停止合并。
+- 创建请求结果未知时只读查询相同 MR 并返回恢复信息；不会自动再次创建或直接评审。
+- 合并响应丢失时查询 MR，已合并按成功返回，否则保留结果未知。
+- 明确的“源分支相对目标分支没有改动，不能新建代码评审”返回 `status: skipped`；其他创建错误仍失败。
+- 部分完成返回已创建 MR、已完成阶段、失败阶段及 `resumeArgs`。这些参数为数组，调用方应逐项传参；显式传入的 profile、配置文件、组织、域名和版本会被保留，Token 不会写入恢复参数。
+
+服务端最终负责合并冲突及门禁检查。版本检查和合并不是原子操作，无法保证检查后分支不会被其他人更新。
+MR 合并成功不表示流水线或部署成功；用流水线命令另行核对。
+
+## 流水线列表、日志、启动和取消
+
+```bash
+yunxiao pipeline list --name 发布 --all-pages
+yunxiao pipeline jobs 123 456 --output json
+yunxiao pipeline logs 123 456 789 --output text
+yunxiao pipeline start 123 --params-file ./run.json --yes --output json
+yunxiao pipeline cancel 123 456 --yes --output json
+```
+
+`jobs` 从运行详情整理阶段、任务信息；`logs` 返回单次日志快照，JSON 保留 `content`、`last`、`more`，文本模式在存在更多日志时提示。
+`start` 返回 `pipelineRunId`；`params-file` 内容直接写运行参数对象，CLI 按 API 要求包装成 `params` JSON 字符串。例如：
+
+```json
+{"envs":{"ENV":"test"},"runningBranchs":{"https://codeup.aliyun.com/org/app.git":"master"},"comment":"手动验证"}
+```
+
+`cancel` 返回接受结果和随后的运行状态；返回接受成功不代表运行已终止。读取状态失败返回部分完成错误。
+
+## 配置与诊断
+
+```bash
+yunxiao config set dev --organization-id org-id --edition center --token-env DEV_YUNXIAO_TOKEN --project-ids project-1
+yunxiao config use dev
+yunxiao config list
+yunxiao config show --profile dev
+yunxiao auth whoami --profile dev
+yunxiao doctor
+yunxiao doctor --remote
+```
+
+默认配置文件为 `$XDG_CONFIG_HOME/yunxiao/config.json`，未设置时为 `~/.config/yunxiao/config.json`。
+可用 `--config` 或 `YUNXIAO_CONFIG` 覆盖路径；配置文件权限为 0600。
+通过 `--profile`、`YUNXIAO_PROFILE` 或保存的当前 profile 选择配置。
+取值优先级：命令参数 > 环境变量 > profile > 默认值。
+profile 保存域名、组织、版本、项目、分类及 `token-env` 环境变量名，不保存明文 Token。
+`config show` 显示 profile 保存值；环境变量覆盖的最终效果可通过诊断核对。
+
+`doctor` 检查配置、Token 是否存在和域名/版本格式，不发请求。
+`doctor --remote` 额外读取当前用户验证连接和身份；不会验证每个项目的访问权限或写权限。
+
+## 文件输入与错误契约
+
+描述、内容、评审意见及运行参数分别支持 `--description-file`、`--content-file`、`--comment-file`、`--params-file`。
+文件名 `-` 读取 stdin；一次命令只能有一个 stdin 输入。相同字段的直接文本与文件输入互斥。
+UTF-8 内容、换行和等号原样保留；文件无法读取时在 API 调用前失败。
+
+```bash
+yunxiao workitem comment workitem-id --content-file ./comment.md --yes
+yunxiao workitem comment workitem-id --parent-id comment-id --content "回复" --yes
+yunxiao mr get 2813489 12 --output json --error-format json
+```
+
+成功结果写 stdout，分页提示与错误写 stderr。`--error-format json` 的错误结构：
+
+```json
+{"error":{"code":"PARTIAL_OPERATION","message":"...","details":{"localId":12,"completed":["create"],"failedStage":"review","resumeArgs":["mr","release","app","master","release","--resume","12","--yes"]}}}
+```
+
+服务端提供请求 ID 时错误中保留 `requestId`；Token 和带查询参数的 URL 会被脱敏。
+退出码从原先统一的 1 细分为：0 成功/明确跳过，1 未分类/响应格式错误，2 参数或配置错误，3 认证或权限错误，4 不存在，5 冲突或前置条件不满足，6 网络/超时/限流/服务不可用，7 部分完成或写入结果未知。
+已有脚本应以非零判断失败，需要细分时再按上述约定处理。
+
+### API 契约参考
+
+- [MR 版本列表](https://help.aliyun.com/zh/yunxiao/developer-reference/listchangerequestpatchsets-query-the-list-of-merge-request-versions)、[变更文件树](https://help.aliyun.com/zh/yunxiao/developer-reference/getchangerequesttree-queries-the-change-file-tree-for-merge-requests)、[固定提交比较](https://help.aliyun.com/zh/yunxiao/developer-reference/getcompare)
+- [MR 评论列表](https://help.aliyun.com/zh/yunxiao/developer-reference/listmergerequestcomments)、[创建 MR 评论](https://help.aliyun.com/zh/yunxiao/developer-reference/createchangerequestcomment)
+- [启动流水线](https://help.aliyun.com/zh/yunxiao/developer-reference/createpipelinerun)、[终止运行](https://help.aliyun.com/zh/yunxiao/developer-reference/updatepipelinerun)、[任务日志](https://help.aliyun.com/zh/yunxiao/developer-reference/getpipelinejobrunlog)

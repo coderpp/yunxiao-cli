@@ -190,10 +190,13 @@ test("create change request sends reviewer and branch details", async () => {
 test("release workflow finds repository, creates change request, approves, and merges without deleting source branch", async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   const responses = [
-    { id: "user-1", name: "Release Owner" },
     [{ id: 2813489, name: "yunxiao-cli", path: "yunxiao-cli", pathWithNamespace: "coderpp/yunxiao-cli" }],
+    [],
+    { id: "user-1", name: "Release Owner" },
     { localId: 16, projectId: 2813489 },
+    [{ patchSetBizId: "patch-1", commitId: "sha-1", relatedMergeItemType: "MERGE_SOURCE", versionNo: 1 }],
     { result: true },
+    [{ patchSetBizId: "patch-1", commitId: "sha-1", relatedMergeItemType: "MERGE_SOURCE", versionNo: 1 }],
     { status: "MERGED" }
   ];
   const fetcher = async (url: string | URL | Request, init?: RequestInit) => {
@@ -221,15 +224,16 @@ test("release workflow finds repository, creates change request, approves, and m
     repository: { id: 2813489, name: "yunxiao-cli", path: "yunxiao-cli", pathWithNamespace: "coderpp/yunxiao-cli" },
     changeRequest: { localId: 16, projectId: 2813489 },
     review: { result: true },
+    status: "merged",
     merge: { status: "MERGED" }
   });
-  assert.match(calls[0].url, /\/oapi\/v1\/platform\/user$/);
-  assert.match(calls[1].url, /\/repositories\?page=1&perPage=20&search=yunxiao-cli&archived=false$/);
-  assert.match(calls[2].url, /\/repositories\/2813489\/changeRequests$/);
-  assert.deepEqual(JSON.parse(String(calls[2].init.body)).reviewerUserIds, ["user-1"]);
-  assert.match(calls[3].url, /\/repositories\/2813489\/changeRequests\/16\/review$/);
-  assert.match(calls[4].url, /\/repositories\/2813489\/changeRequests\/16\/merge$/);
-  assert.deepEqual(JSON.parse(String(calls[4].init.body)), {
+  assert.match(calls[2].url, /\/oapi\/v1\/platform\/user$/);
+  assert.match(calls[0].url, /\/repositories\?page=1&perPage=20&search=yunxiao-cli&archived=false$/);
+  assert.match(calls[3].url, /\/repositories\/2813489\/changeRequests$/);
+  assert.deepEqual(JSON.parse(String(calls[3].init.body)).reviewerUserIds, ["user-1"]);
+  assert.match(calls[5].url, /\/repositories\/2813489\/changeRequests\/16\/review$/);
+  assert.match(calls[7].url, /\/repositories\/2813489\/changeRequests\/16\/merge$/);
+  assert.deepEqual(JSON.parse(String(calls[7].init.body)), {
     mergeType: "no-fast-forward",
     removeSourceBranch: false
   });
@@ -238,8 +242,9 @@ test("release workflow finds repository, creates change request, approves, and m
 test("release workflow can create only without review or merge", async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   const responses = [
-    { id: "user-1", name: "Release Owner" },
     [{ id: 2813489, name: "yunxiao-cli", path: "yunxiao-cli" }],
+    [],
+    { id: "user-1", name: "Release Owner" },
     { localId: 18, projectId: 2813489 }
   ];
   const fetcher = async (url: string | URL | Request, init?: RequestInit) => {
@@ -263,12 +268,13 @@ test("release workflow can create only without review or merge", async () => {
     createOnly: true
   });
 
-  assert.equal(calls.length, 3);
-  assert.match(calls[2].url, /\/repositories\/2813489\/changeRequests$/);
+  assert.equal(calls.length, 4);
+  assert.match(calls[3].url, /\/repositories\/2813489\/changeRequests$/);
   assert.deepEqual(result, {
     repository: { id: 2813489, name: "yunxiao-cli", path: "yunxiao-cli" },
     changeRequest: { localId: 18, projectId: 2813489 },
     review: null,
+    status: "created",
     merge: null
   });
 });
@@ -502,7 +508,7 @@ test("api errors include request method, url, and response body", async () => {
       assert.ok(error instanceof YunxiaoApiError);
       assert.equal(error.status, 403);
       assert.equal(error.method, "GET");
-      assert.match(error.url, /\/repositories\?search=sjc-web$/);
+      assert.match(error.url, /\/repositories$/);
       assert.match(error.message, /GET https:\/\/openapi-rdc\.aliyuncs\.com/);
       assert.match(error.message, /no permission/);
       return true;

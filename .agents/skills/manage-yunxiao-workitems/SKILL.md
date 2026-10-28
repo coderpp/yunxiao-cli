@@ -324,3 +324,14 @@ npx --yes --package @coderpp/yunxiao-cli yunxiao project member-remove <projectI
 - 项目范围缺失或项目范围不明确。
 - 用户要求修改数据但没有明确工作项、成员、项目或评论内容。
 - 任何会修改数据的命令缺少 `--yes`。
+
+## 文件评论与查询完整性（CLI >= 0.2.0）
+
+工作项评论支持文件输入和回复；仍须按任务授权执行评论写入：
+
+```bash
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem comment <workitemId> --content-file ./comment.md --yes
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem comment <workitemId> --parent-id <commentId> --content-file ./reply.md --yes
+```
+
+需要完整列表时使用 `--all-pages`，特别是本地状态过滤。错误和分页提示在 stderr，JSON 结果在 stdout；`--error-format json` 可读取错误类别。这些命令要求 @coderpp/yunxiao-cli >= 0.2.0。
