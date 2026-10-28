@@ -169,7 +169,7 @@ mr release <repositoryName> <sourceBranch> <targetBranch>
 例如，把 `release` 合并到 `master`：
 
 ```bash
-node dist/src/index.js mr release syjc-web release master --yes
+node dist/src/index.js mr release example-web release master --yes
 ```
 
 这个命令会先按仓库名称查询代码库 ID，再用当前 token 对应的用户作为评审人创建合并请求，随后评审通过并合并。合并时固定保留源分支，不会删除源分支。
@@ -177,7 +177,7 @@ node dist/src/index.js mr release syjc-web release master --yes
 如果只想创建合并请求，不自动评审和合并，使用 `--create-only`：
 
 ```bash
-node dist/src/index.js mr release syjc-web release master --yes --create-only
+node dist/src/index.js mr release example-web release master --yes --create-only
 ```
 
 `--create-only` 仍会在云效创建合并请求，所以仍然需要 `--yes`。
@@ -186,13 +186,7 @@ node dist/src/index.js mr release syjc-web release master --yes --create-only
 
 发布版本时，如果云效返回“源分支相对目标分支没有改动，不能新建代码评审”，可视为该仓库无改动并跳过。
 
-发布所有版本时，推荐顺序为：
-
-1. 商混版：`master` -> `gx-concrete/dev`
-2. 蜀道版：`master` -> `sdjt/dev`
-3. 标准版：`master` -> `release`
-
-标准版应最后发布。
+目标分支和多个版本的发布顺序由使用方按自己的项目约定指定。
 
 查询变更文件树：
 
