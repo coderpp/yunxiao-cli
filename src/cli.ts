@@ -1,3 +1,4 @@
+import { readWorkitemContent, downloadWorkitemImages, downloadWorkitemAttachments, parseWorkitemUrl } from "./workitem-content.js";
 import {
   YunxiaoClient,
   type Fetcher,
@@ -28,7 +29,7 @@ type Flags = Record<string, FlagValue>;
 
 const mergeTypes = new Set(["ff-only", "no-fast-forward", "squash", "rebase"]);
 const outputFormats = new Set<OutputFormat>(["table", "json"]);
-const booleanFlags = new Set(["all-pages", "create-only", "help", "json", "remove-source-branch", "yes"]);
+const booleanFlags = new Set(["download-attachments", "all-pages", "create-only", "help", "json", "remove-source-branch", "yes"]);
 const workitemStateNames = new Map([
   ["todo", ["TODO", "待处理", "待办"]],
   ["opened", ["TODO", "待处理", "待办"]],
@@ -58,7 +59,7 @@ export async function runCli(args = process.argv.slice(2), env = process.env, io
     const client = createClient(parsed.flags, env, io.fetcher);
     const result = await runCommand(scope, command, parsed, client, env);
 
-    printResult(result, outputFormat, stdout);
+    printResult(result, scope === "workitem" && ["content", "images", "attachments"].includes(command) ? "json" : outputFormat, stdout);
     return 0;
   } catch (error) {
     stderr(`${error instanceof Error ? error.message : String(error)}\n`);
@@ -238,6 +239,23 @@ async function runWorkitemCommand(
       const currentUser = await client.getCurrentUser();
       return searchWorkitems(client, { ...parsed.flags, "assigned-to": currentUser.id }, env);
     }
+    case "content": {
+      const link = requiredPositional(workitemId, "workitemUrl");
+      const { projectId, workitemId: id } = parseWorkitemUrl(link);
+      if (!workitemProjectIds(parsed.flags, env).includes(projectId)) throw new Error("Link project is outside the configured project scope.");
+      return readWorkitemContent(client, link, {
+        dir: optionalString(parsed.flags.dir) ?? `workitem-${id}-content`,
+        downloadAttachments: hasFlag(parsed.flags, "download-attachments")
+      });
+    }
+    case "images":
+      return downloadWorkitemImages(client, requiredPositional(workitemId, "workitemId"), {
+        dir: optionalString(parsed.flags.dir) ?? `workitem-${workitemId}-images`
+      });
+    case "attachments":
+      return downloadWorkitemAttachments(client, requiredPositional(workitemId, "workitemId"), {
+        dir: optionalString(parsed.flags.dir) ?? `workitem-${workitemId}-attachments`
+      });
     case "get":
       return client.getWorkitem(requiredPositional(workitemId, "workitemId"));
     case "update":
@@ -870,6 +888,9 @@ Usage:
   yunxiao workitem list --project-ids p1,p2 [--assigned-to userId] [--created-by userId] [--state todo|doing|done] [--from "2026-04-01 00:00:00"] [--to "2026-04-30 23:59:59"]
   yunxiao workitem mine --project-ids p1,p2 [--state todo|doing|done] [--output table|json]
   yunxiao workitem get <workitemId> [--output table|json]
+  yunxiao workitem content <workitemUrl> [--dir directory] [--download-attachments]
+  yunxiao workitem images <workitemId> [--dir directory]
+  yunxiao workitem attachments <workitemId> [--dir directory]
   yunxiao workitem update <workitemId> --yes [--assigned-to userId] [--participants user1,user2] [--due-date "2026-05-01 18:00:00"] [--field key=value]
   yunxiao workitem activities <workitemId> [--output table|json]
   yunxiao workitem comments <workitemId> [--output table|json]

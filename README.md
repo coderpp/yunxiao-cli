@@ -431,3 +431,25 @@ node dist/src/index.js workitem comment <workitemId> --content "处理完成，�
 - `pipeline retry-job`
 - `workitem update`
 - `workitem comment`
+
+## 根据链接读取完整工作项及下载文件
+
+```bash
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem content "<云效工作项链接>" --dir ./content
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem content "<云效工作项链接>" --dir ./content --download-attachments
+
+# 单独下载正文及评论图片，或普通附件
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem images <workitemId> --dir ./images
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem attachments <workitemId> --dir ./attachments
+```
+
+`content`、`images`、`attachments` 始终输出 JSON。沿用现有 Token、组织、中心版/Region 版配置，
+`content` 校验链接项目位于 `YUNXIAO_PROJECT_IDS` 或 `--project-ids` 配置的范围内。
+`content` 保留全部详情字段和评论原文，`descriptionHtml`、评论 `contentHtml` 的图片引用替换为本地绝对路径；
+`images` 返回 `fileId`、`path`、`source`，支持 HTML、富文本 JSON、Markdown，跨来源重复图片只下载一次。
+普通附件默认仅返回元信息；开启 `--download-attachments` 后返回附件 `path`。
+不返回附件临时签名 URL，下载时不向存储站点传递 Token。
+图片位于 `images/`、普通附件位于 `attachments/`，默认根目录为 `workitem-<ID>-content`。
+已有文件不覆盖，重复读取请选择新目录；失败返回非零退出码，清理未完成文件并保留已完成文件。
+仅支持带 `fileIdentifier` 的云效图片（PNG/JPEG/GIF/WebP/BMP/ICO）；外部图片和 data URL 会报错。
+需要工作项、评论、附件只读权限。完整内容不递归包含关联工作项或历史动态。

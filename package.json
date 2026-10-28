@@ -1,6 +1,6 @@
 {
   "name": "@coderpp/yunxiao-cli",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "A CLI for Yunxiao merge request, pipeline retry, project member, and workitem workflows.",
   "type": "module",
   "repository": {
@@ -29,6 +29,7 @@
     "access": "public"
   },
   "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
     "@types/node": "^20.12.12",
     "typescript": "^5.4.5"
   },
@@ -38,5 +39,9 @@
   "files": [
     "dist/src",
     "README.md"
-  ]
+  ],
+  "dependencies": {
+    "markdown-it": "^14.3.3",
+    "parse5": "^7.3.0"
+  }
 }

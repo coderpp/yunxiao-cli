@@ -1,6 +1,6 @@
 ---
 name: manage-yunxiao-workitems
-description: Use when a technical lead wants to query or update Yunxiao project workitems, inspect workitem activities/comments, or add/remove Yunxiao project members within a preconfigured project scope.
+description: Use when a technical lead wants to query or update Yunxiao project workitems, read complete workitem content from a Yunxiao link (including images and optional attachment downloads), inspect workitem activities/comments, or add/remove Yunxiao project members within a preconfigured project scope.
 ---
 
 # 云效工作项与项目成员管理
@@ -63,6 +63,51 @@ YUNXIAO_PROJECT_IDS
 不要自行扩展到所有项目。若 `YUNXIAO_PROJECT_IDS` 未设置，或用户要求的项目不在该范围内，停止并询问用户。
 
 工作项查询默认不按类型筛选；不要主动添加 `--category`，除非用户明确指定工作项类型范围。
+
+## 根据链接读取完整工作项（含图片与可选附件）
+
+用户提供云效工作项链接，要求查看、需求评审或据此生成方案时，优先使用 `@coderpp/yunxiao-cli` 的 `workitem content`。
+所有命令统一在 Node 版 `yunxiao-cli` 仓库实现，命令名为 `yunxiao`。
+
+执行前按前文加载环境；此命令沿用 `YUNXIAO_TOKEN`、`YUNXIAO_ORGANIZATION_ID`、`YUNXIAO_EDITION` 等配置，并校验链接项目在 `YUNXIAO_PROJECT_IDS`（或 `--project-ids`）内。
+
+```bash
+# 在已加载环境的同一个 shell 中执行；使用新的空目录，避免覆盖已有文件
+CONTENT_DIR="$(mktemp -d /tmp/yunxiao-content.XXXXXX)"
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem content "<云效工作项链接>" \
+  --dir "$CONTENT_DIR" > "$CONTENT_DIR/content.json"
+```
+
+默认下载正文和评论图片，普通附件仅返回元信息。用户明确要求下载附件，或附件是完成当前已授权阅读/评审所需的原型、需求说明、模板时，追加 `--download-attachments`。
+
+```bash
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem content "<云效工作项链接>" \
+  --dir "$CONTENT_DIR" --download-attachments > "$CONTENT_DIR/content.json"
+```
+
+以上两段是可选运行方式，重复读取时重新生成空目录。命令始终输出 JSON：
+
+- `workitem`：API 返回的全部详情字段，含原始正文和自定义字段。
+- `descriptionHtml`：正文 HTML，图片 src 已替换为本地绝对路径。
+- `comments`：评论原始内容及 `contentHtml`，保留作者、父评论等信息，支持富文本及 Markdown 图片。
+- `images`：`fileId`、`path`、`source`（`description` / `comment:<评论ID>`）；跨来源去重下载。
+- `attachments`：普通附件信息；下载后含 `path`，默认没有本地路径。不输出临时签名下载 URL。
+
+实际打开 `images[].path` 查看图片、按任务读取已下载附件后，才可称已查看对应内容。拿到路径不等于识别了图中文字。
+完整内容范围为详情、正文、评论和附件列表；历史动态、关联工作项不在此命令范围，按需使用原有命令。
+
+只下载图片或普通附件也可使用：
+
+```bash
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem images <workitemId> --dir "<空目录>"
+npx --yes --package @coderpp/yunxiao-cli yunxiao workitem attachments <workitemId> --dir "<空目录>"
+```
+
+本地调试时在 `~/repos/tool/yunxiao-cli` 执行 `npm run build` 后使用 `node dist/src/index.js workitem content ...`，参数相同。
+权限要求：工作项、工作项评论、工作项附件只读权限及目标项目访问权限。遇到 API 权限错误按停止条件处理。
+图片通过官方 `GetWorkitemFile` 获取下载地址；不要向网页 `/projex/api/workitem/file/url` 接口反复发送 PAT，
+该网页接口的 `401 invalid session` 不能证明 OpenAPI Token 缺少权限或截图无法下载。
+不覆盖已有文件；失败时保留已完成文件并返回非零退出码。报告缺失部分，不把部分下载称为完整成功。
 
 ## 成员识别
 

@@ -290,6 +290,14 @@ export class YunxiaoClient {
     return this.request("GET", `${this.projexPath("/workitems")}/${encodePathSegment(workitemId)}`);
   }
 
+  getWorkitemFile(workitemId: string, fileId: string): Promise<unknown> {
+    return this.request("GET", `${this.projexPath("/workitems")}/${encodePathSegment(workitemId)}/files/${encodePathSegment(fileId)}`);
+  }
+
+  listWorkitemAttachments(workitemId: string): Promise<unknown> {
+    return this.request("GET", `${this.projexPath("/workitems")}/${encodePathSegment(workitemId)}/attachments`);
+  }
+
   updateWorkitem(workitemId: string, options: UpdateWorkitemOptions): Promise<unknown> {
     return this.request("PUT", `${this.projexPath("/workitems")}/${encodePathSegment(workitemId)}`, undefined, options);
   }
