@@ -97,8 +97,19 @@ export async function requestJson(
               "Invalid pagination response header.",
               1,
             );
+          // Yunxiao keeps x-next-page non-empty on the last page; x-total-pages marks the end.
+          const page = Number(response.headers.get("x-page"));
+          const totalPages = response.headers.get("x-total-pages");
+          const last =
+            page > 0 && totalPages !== null && page >= Number(totalPages);
           pageMetadata.set(value, {
-            next: next === null ? undefined : next === "" ? null : Number(next),
+            next: last
+              ? null
+              : next === null
+                ? undefined
+                : next === ""
+                  ? null
+                  : Number(next),
             perPage: per && Number(per) > 0 ? Number(per) : undefined,
           });
         }

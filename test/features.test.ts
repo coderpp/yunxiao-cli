@@ -154,6 +154,21 @@ test("all pages follows server headers even with a short server-clamped page", a
   assert.deepEqual(JSON.parse(result.out), [{ localId: 1 }, { localId: 2 }]);
   assert.equal(result.calls[1].url.searchParams.get("page"), "2");
 });
+test("all pages stops at x-total-pages when the last page still sets x-next-page", async () => {
+  let n = 0;
+  const result = await cli(["mr", "list", "--all-pages", "--json"], async () => {
+    n++;
+    return response([{ localId: n }], {
+      "x-page": String(n),
+      "x-next-page": n === 1 ? "2" : "1",
+      "x-total-pages": "2",
+      "x-per-page": "1",
+    });
+  });
+  assert.equal(result.exit, 0);
+  assert.deepEqual(JSON.parse(result.out), [{ localId: 1 }, { localId: 2 }]);
+  assert.equal(result.calls.length, 2);
+});
 test("single-page warning stays off JSON stdout", async () => {
   const r = await cli(["member", "list", "--json"], async () =>
     response([{ id: 1 }], { "x-next-page": "2" }),

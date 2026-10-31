@@ -1,5 +1,9 @@
 # 更新记录
 
+## 0.2.1
+
+- 修复全量分页在云效最后一页仍返回非空 `x-next-page` 时报 `Server returned a non-advancing page.`，导致 `mr release` 和 `--all-pages` 列表失败；改为以 `x-total-pages` 判断末页。
+
 ## 0.2.0
 
 - 增加 MR 详情、固定版本差异、评论查询/发表/回复及行内评论。
