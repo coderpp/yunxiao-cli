@@ -19,11 +19,8 @@
     "pack:dry-run": "npm pack --dry-run",
     "prepack": "npm run build",
     "skills:sync": "scripts/sync-skills.sh",
-    "skills:watch": "scripts/watch-skills.sh",
-    "skills:watch:start": "scripts/start-skill-sync-watch.sh",
-    "skills:watch:status": "scripts/status-skill-sync-watch.sh",
-    "skills:watch:stop": "scripts/stop-skill-sync-watch.sh",
-    "test": "tsc -p tsconfig.json && node --test dist/test/*.test.js"
+    "test": "tsc -p tsconfig.json && node --test dist/test/*.test.js",
+    "skills:check": "scripts/sync-skills.sh --check"
   },
   "publishConfig": {
     "access": "public"

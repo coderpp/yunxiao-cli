@@ -1,337 +1,63 @@
 ---
 name: manage-yunxiao-workitems
-description: Use when a technical lead wants to query or update Yunxiao project workitems, read complete workitem content from a Yunxiao link (including images and optional attachment downloads), inspect workitem activities/comments, or add/remove Yunxiao project members within a preconfigured project scope.
+description: 使用云效官方 MCP 查询工作项、读取链接中的完整正文和图片附件、更新负责人和参与人、查看动态及评论；项目成员维护、顶层计划完成时间和定向回复按已确认的能力缺口使用 CLI 补充。工作项访问限于预配置项目范围。
 ---
 
 # 云效工作项与项目成员管理
 
-## 目标
+## 使用前
 
-帮助技术负责人快速查看待办、进行中、已完成工作项，调整工作项负责人/参与人/计划完成时间，维护项目成员，并补充工作项评论。
+先读 [公共说明](references/common.md)，按其中规则确定组织、项目范围、成员与工具。文件和写操作的补充入口见 [CLI 补充](references/cli-supplement.md)。
 
-## 运行前置：加载 `.env`
+## 查询口径
 
-所有云效 CLI 命令运行前，必须先加载运行环境，且加载动作必须和实际命令在同一个 shell 中；如果每次用新的 shell 调用，就每次都重新加载。
+查询参数、状态技术映射与分页规则统一见公共说明的“工作项查询”。本技能中“待办 / 待处理 / 未完成”包含 `todo+doing`；用户明确“仅 todo / 未开始”才只取 todo。“进行中”取 doing，“已完成”取 done。不要把统计技能的 todo-only 默认套入本技能。
 
-按以下顺序尝试加载，先命中的文件即可：
+最近一个月待办默认从上月同日至今天，按创建时间过滤。明细包含任务编码、标题与链接、计划完成时间、优先级、创建时间、工作项类型、状态和负责人。计划完成时间先取 `dueDate/planFinishTime/plannedFinishTime/expectedFinishTime`，再检查自定义字段；优先级取 `priority` 或“优先级”的 `values[].displayValue`。
 
-1. 仓库根目录 `.env`
-2. 用户根目录 `~/.env`
-3. 用户根目录 `~/.zshrc`
+链接优先用接口的 `detailUrl/webUrl/url`。无链接时，中心站可按 `https://devops.aliyun.com/projex/project/<space.id>/<category-route>/<id>` 生成并说明来源；`Req/Task/Bug` 对应 `req/task/bug`，其他类别先核实路由。Region 站沿用用户原链接的组织域名。
 
-```bash
-set -a
-if [ -f .env ]; then
-  source .env || { set +a; exit 1; }
-elif [ -f "${HOME}/.env" ]; then
-  source "${HOME}/.env" || { set +a; exit 1; }
-elif [ -f "${HOME}/.zshrc" ]; then
-  source "${HOME}/.zshrc" || { set +a; exit 1; }
-else
-  set +a
-  echo "未找到 .env、${HOME}/.env 或 ${HOME}/.zshrc" >&2
-  exit 1
-fi
-set +a
-npx --yes --package @coderpp/yunxiao-cli yunxiao <command>
+## 成员识别与汇总规则
+
+“所有成员”的待办、进行中或已完成汇总，默认排除产品同事：蒋鹏、李莎仕、刘志鹏、罗宇辉、顾宝程、刘远航、王恒、彭娜娜、崔永康、王旭波、徐亚辉。用户点名某人或明确要求包含时按用户指定。除非追问，不在汇报中展示排除名单或排除前后数量。
+
+## 根据链接读取完整工作项
+
+1. 从链接解析项目 ID、工作项 ID，先校验项目范围，再调用 `get_work_item`。
+2. 保留全部详情字段。`description` 可能是 HTML、Markdown，或含 `htmlValue/jsonMLValue` 的 JSON 字符串；先解析实际格式，不能把整个 JSON 当作正文。
+3. 分页调用 `list_work_item_comments`，保留作者、时间及父评论信息；调用 `list_workitem_attachments` 取得附件列表。`includeDetails=true` 不等于已读取评论和附件。
+4. 从正文与评论中的 HTML、Markdown 或 JSON 图片节点提取 `fileIdentifier` / 文件 ID，以 `(workItemId, fileId)` 去重，调用 `get_workitem_file`。参数是 `workitemId`（小写 i），其他详情/列表工具通常使用 `workItemId`。
+5. `get_workitem_file` 返回临时 `url`；及时下载到本次空临时目录，不覆盖已有文件。对象存储下载请求不携带云效 PAT。不要把临时签名 URL 写入报告、说明或持久日志；持久结果保留本地路径和文件 ID。
+6. 实际打开图片、读取附件后才可称已查看内容。普通附件默认只列元信息；用户要求下载，或附件是当前已授权阅读/评审的必要资料时才下载。普通附件可用附件 ID 再调用 `get_workitem_file`。
+7. 需要离线内容包时，可用已有 `workitem content` 文件封装，见 CLI 补充；普通阅读仍走 MCP。也可用本地文件处理组合已取得的详情、正文、评论、图片和附件。文件失败要列出缺失部分，不能宣称完整成功；不为此新增一套云效 API 客户端。
+
+正文图片的网页 `/projex/api/workitem/file/url` 依赖浏览器登录，不能直接用 PAT 请求；走官方 `get_workitem_file`。历史动态与关联工作项按需单独调用 `list_workitem_activities`、`list_workitem_relation_records`，不把它们混同于评论。
+
+## 修改工作项与评论
+
+用户已明确要求修改时，先读取详情、确认项目与成员，再调用 `update_work_item`。所有更新字段放在 `updateWorkItemFields` 内，只传用户要求修改的字段：
+
+```json
+{
+  "organizationId": "<组织ID>",
+  "workItemId": "<工作项ID>",
+  "updateWorkItemFields": {
+    "assignedTo": "<负责人用户ID>",
+    "participants": ["<参与人用户ID>"]
+  }
+}
 ```
 
-以上文件均不存在、加载失败或必要的 `YUNXIAO_*` 环境变量缺失时，停止并提示用户。不要打印 `.env`、`.zshrc` 内容、token 或其他密钥。
+计划完成时间必须先核对字段配置。当前 MCP schema 没有顶层 `dueDate`；不得把它硬塞进参数，或未经验证改成 `customFieldValues.dueDate`。真实自定义日期字段用 `get_work_item_type_field_config` 确认 ID、类型和值格式后，才可通过 `customFieldValues` 更新；系统顶层日期按参考文档中的 CLI 补充操作处理。实际/预计工时是受控字段，不能通过 `customFieldValues` 修改。
 
-## 固定命令前缀
-
-默认用 npx 方式运行：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao
-```
-
-如果是在 `yunxiao-cli` 仓库内验证尚未发布的新命令，可临时使用本地构建：
-
-```bash
-node dist/src/index.js
-```
-
-## 项目范围
-
-项目范围必须由环境变量提前确定：
-
-```bash
-YUNXIAO_PROJECT_IDS
-```
-
-不要自行扩展到所有项目。若 `YUNXIAO_PROJECT_IDS` 未设置，或用户要求的项目不在该范围内，停止并询问用户。
-
-工作项查询默认不按类型筛选；不要主动添加 `--category`，除非用户明确指定工作项类型范围。
-
-## 根据链接读取完整工作项（含图片与可选附件）
-
-用户提供云效工作项链接，要求查看、需求评审或据此生成方案时，优先使用 `@coderpp/yunxiao-cli` 的 `workitem content`。
-所有命令统一在 Node 版 `yunxiao-cli` 仓库实现，命令名为 `yunxiao`。
-
-执行前按前文加载环境；此命令沿用 `YUNXIAO_TOKEN`、`YUNXIAO_ORGANIZATION_ID`、`YUNXIAO_EDITION` 等配置，并校验链接项目在 `YUNXIAO_PROJECT_IDS`（或 `--project-ids`）内。
-
-```bash
-# 在已加载环境的同一个 shell 中执行；使用新的空目录，避免覆盖已有文件
-CONTENT_DIR="$(mktemp -d /tmp/yunxiao-content.XXXXXX)"
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem content "<云效工作项链接>" \
-  --dir "$CONTENT_DIR" > "$CONTENT_DIR/content.json"
-```
-
-默认下载正文和评论图片，普通附件仅返回元信息。用户明确要求下载附件，或附件是完成当前已授权阅读/评审所需的原型、需求说明、模板时，追加 `--download-attachments`。
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem content "<云效工作项链接>" \
-  --dir "$CONTENT_DIR" --download-attachments > "$CONTENT_DIR/content.json"
-```
-
-以上两段是可选运行方式，重复读取时重新生成空目录。命令始终输出 JSON：
-
-- `workitem`：API 返回的全部详情字段，含原始正文和自定义字段。
-- `descriptionHtml`：正文 HTML，图片 src 已替换为本地绝对路径。
-- `comments`：评论原始内容及 `contentHtml`，保留作者、父评论等信息，支持富文本及 Markdown 图片。
-- `images`：`fileId`、`path`、`source`（`description` / `comment:<评论ID>`）；跨来源去重下载。
-- `attachments`：普通附件信息；下载后含 `path`，默认没有本地路径。不输出临时签名下载 URL。
-
-实际打开 `images[].path` 查看图片、按任务读取已下载附件后，才可称已查看对应内容。拿到路径不等于识别了图中文字。
-完整内容范围为详情、正文、评论和附件列表；历史动态、关联工作项不在此命令范围，按需使用原有命令。
-
-只下载图片或普通附件也可使用：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem images <workitemId> --dir "<空目录>"
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem attachments <workitemId> --dir "<空目录>"
-```
-
-本地调试时在 `~/repos/tool/yunxiao-cli` 执行 `npm run build` 后使用 `node dist/src/index.js workitem content ...`，参数相同。
-权限要求：工作项、工作项评论、工作项附件只读权限及目标项目访问权限。遇到 API 权限错误按停止条件处理。
-图片通过官方 `GetWorkitemFile` 获取下载地址；不要向网页 `/projex/api/workitem/file/url` 接口反复发送 PAT，
-该网页接口的 `401 invalid session` 不能证明 OpenAPI Token 缺少权限或截图无法下载。
-不覆盖已有文件；失败时保留已完成文件并返回非零退出码。报告缺失部分，不把部分下载称为完整成功。
-
-## 成员识别
-
-- 如果用户提供的是用户 ID，直接使用。
-- 如果用户提供的是姓名，先解析为用户 ID，再执行工作项或成员变更命令。
-- 可通过项目成员或组织成员查询解析姓名：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao member list --per-page 100 --output json
-```
-
-如果姓名匹配多个成员，必须停止并请用户确认具体用户。
-
-## 产品同事排除规则
-
-当用户要求查询“所有成员”的待办、进行中或已完成工作项时，默认从结果中排除以下产品同事：
-
-- 蒋鹏
-- 李莎仕
-- 刘志鹏
-- 罗宇辉
-- 顾宝程
-- 刘远航
-- 王恒
-- 彭娜娜
-- 崔永康
-- 王旭波
-- 徐亚辉
-
-该规则只用于“所有成员”汇总或列表。用户明确指定某个成员时，即使该成员在排除名单中，也按用户指定查询。排除动作仅作为内部数据处理逻辑；最终汇报不要体现排除规则、排除名单、排除前后数量，除非用户明确追问排除口径。
-
-## 查询工作项
-
-待办口径：用户说“待办”“待处理”“未完成”“待办事项”时，默认包含状态为 `todo` 和 `doing` 的工作项；也就是“进行中”已算作待办。只有用户明确要求“仅 todo”“只看未开始/待处理状态”时，才只查询 `--state todo`。
-
-当前用户待办工作项：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem mine --state todo --all-pages --output json
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem mine --state doing --all-pages --output json
-```
-
-指定成员待办工作项：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <userId> --state todo --all-pages --output json
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <userId> --state doing --all-pages --output json
-```
-
-指定创建人工作项：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --created-by <userId> --all-pages --output json
-```
-
-`--created-by` 支持逗号分隔多个用户 ID，也可以使用等价参数 `--creator`。可按需追加 `--state`、`--from`、`--to` 等查询过滤。
-
-所有成员待办工作项：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state todo --all-pages --output json
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state doing --all-pages --output json
-```
-
-将 `todo` 和 `doing` 两批结果合并后再汇总和汇报；如有重复，按工作项 `id` 去重。该场景属于“所有成员”查询，默认应用产品同事排除规则；除非用户明确要求包含产品同事。
-
-所有或指定成员进行中的工作项：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state doing --all-pages --output json
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <userId> --state doing --all-pages --output json
-```
-
-只有未指定成员的“所有成员进行中”查询需要排除产品同事。
-
-所有或指定成员已完成的工作项：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state done --all-pages --output json
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --assigned-to <userId> --state done --all-pages --output json
-```
-
-只有未指定成员的“所有成员已完成”查询需要排除产品同事。
-
-按时间范围查询时追加：
-
-```bash
---from "YYYY-MM-DD 00:00:00" --to "YYYY-MM-DD 23:59:59"
-```
-
-如果用户只给开始时间或结束时间，只追加对应参数。默认时间字段为 `gmtCreate`；如果用户要求按更新时间查询，追加 `--date-field gmtModified`。
-
-## 最近 1 个月所有成员待办明细
-
-当用户要求“所有成员最近 1 个月待办事项明细”“近一个月待办明细”时，执行所有成员待办查询；待办包含 `todo` 和 `doing`，两批结果合并去重后输出，并追加最近 1 个月时间范围。默认按创建时间 `gmtCreate` 过滤；如果用户明确要求按更新时间或其他时间字段，再切换 `--date-field`。
-
-macOS/zsh 可用以下时间范围：
-
-```bash
-START="$(date -v-1m '+%Y-%m-%d 00:00:00')"
-END="$(date '+%Y-%m-%d 23:59:59')"
-```
-
-查询命令：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state todo --from "$START" --to "$END" --all-pages --output json
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem list --state doing --from "$START" --to "$END" --all-pages --output json
-```
-
-该场景属于“所有成员”查询，默认应用产品同事排除规则；除非用户明确要求包含产品同事。
-
-明细输出字段必须包含：
-
-- 任务编码：`serialNumber`
-- 标题：`subject`
-- 链接：优先使用返回数据中的 `detailUrl`、`webUrl` 或 `url`；如果接口未返回链接，用 `https://devops.aliyun.com/projex/project/<space.id>/<category-route>/<id>` 生成链接，并在汇报中说明链接由工作项 ID 拼接。`category-route` 按 `categoryId` 映射：`Req` → `req`，`Task` → `task`，`Bug` → `bug`，其他值使用小写形式。
-- 计划完成时间：优先读取直接字段 `dueDate`、`planFinishTime`、`plannedFinishTime`、`expectedFinishTime`；如果没有，查找 `customFieldValues` 中 `fieldName` 包含“计划完成”“截止”“到期”的字段。
-- 优先级：优先读取 `customFieldValues` 中 `fieldId` 为 `priority` 或 `fieldName` 为“优先级”的字段，取 `values[].displayValue`。
-- 创建时间：`gmtCreate`，转换成本地时间 `YYYY-MM-DD HH:mm:ss`。
-- 工作项类型：`workitemType.name`。
-- 状态：从工作项状态字段读取；用于区分 `todo` 和 `doing`。
-
-输出优先使用 Markdown 表格；如果条目很多，先按负责人分组，再列每人的明细。
-
-## 查询工作项动态与评论
-
-获取工作项动态及评论：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem timeline <workitemId> --output json
-```
-
-如果用户只要动态或只要评论：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem activities <workitemId> --output json
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem comments <workitemId> --output json
-```
-
-## 修改工作项
-
-修改负责人、参与人和计划完成时间：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem update <workitemId> \
-  --assigned-to <ownerUserId> \
-  --participants <userId1,userId2> \
-  --due-date "YYYY-MM-DD HH:mm:ss" \
-  --yes \
-  --output json
-```
-
-只修改其中一部分时，只传对应参数。执行前必须确认：
-
-- 工作项 ID 明确。
-- 负责人和参与人都已解析为用户 ID。
-- 计划完成时间格式明确。
-- 用户确实要求修改。
-
-如果项目使用自定义计划完成时间字段，使用：
-
-```bash
---due-field <fieldId>
-```
-
-## 创建工作项评论
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem comment <workitemId> --content "<comment>" --yes --output json
-```
-
-评论内容必须来自用户明确指令，不要代写业务结论。
+普通评论使用 `create_work_item_comment`，传 `content` 与实际格式对应的 `formatType="MARKDOWN"` 或 `"RICHTEXT"`。文件评论先读取文件，将原文作为结构化参数。当前工具没有 `parentId`，定向回复见参考文档，不得将回复降级为新评论。评论内容须来自用户明确指令，不代写业务结论。
 
 ## 项目成员维护
 
-添加项目成员：
+当前 MCP 没有 Projex 项目成员查询、添加、移除工具。`create_resource_member/delete_resource_member/list_resource_members` 面向 Flow 的 `pipeline/hostGroup`，不能用它们操作项目成员。按 [补充操作](references/cli-supplement.md) 使用现有 CLI；多个项目时必须由用户明确目标项目，不能批量扩大范围。
 
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao project member-add <projectId> --user-ids <userId1,userId2> --role-id project.participant --yes --output json
-```
+## 汇报与停止条件
 
-移除项目成员：
+查询汇报项目、时间与类型范围、总数、负责人/状态汇总和关键明细。变更汇报对象、字段或成员、API 结果与回读结果。明确未读图片、未下载附件及不完整分页。
 
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao project member-remove <projectId> --user-ids <userId1,userId2> --role-id project.participant --yes --output json
-```
-
-如果 `YUNXIAO_PROJECT_IDS` 包含多个项目，且用户没有明确指定要维护哪个项目，必须停止并询问用户。不要默认对所有项目添加或移除成员。
-
-## 汇报要求
-
-查询类任务汇报：
-
-- 项目范围。
-- 总数。
-- 按负责人或状态汇总。
-- 关键明细：编号、标题、状态、负责人、工作项 ID。
-- 不要体现排除规则、排除名单、排除前后数量。
-
-变更类任务汇报：
-
-- 执行了什么变更。
-- 影响的工作项或项目。
-- 涉及成员。
-- API 返回是否成功。
-
-## 停止条件
-
-遇到以下情况必须停止并询问用户：
-
-- API 返回权限不足、参数错误、字段不存在、成员不存在或工作项不存在。
-- 用户姓名匹配多个成员或无法匹配成员。
-- 项目范围缺失或项目范围不明确。
-- 用户要求修改数据但没有明确工作项、成员、项目或评论内容。
-- 任何会修改数据的命令缺少 `--yes`。
-
-## 文件评论与查询完整性（CLI >= 0.2.0）
-
-工作项评论支持文件输入和回复；仍须按任务授权执行评论写入：
-
-```bash
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem comment <workitemId> --content-file ./comment.md --yes
-npx --yes --package @coderpp/yunxiao-cli yunxiao workitem comment <workitemId> --parent-id <commentId> --content-file ./reply.md --yes
-```
-
-需要完整列表时使用 `--all-pages`，特别是本地状态过滤。错误和分页提示在 stderr，JSON 结果在 stdout；`--error-format json` 可读取错误类别。这些命令要求 @coderpp/yunxiao-cli >= 0.2.0。
+遇到权限不足、对象不存在、姓名歧义、字段不明、项目范围缺失，停止依赖该信息的操作并说明原因。可独立完成的只读部分继续；不要为测试能力创建评论、改状态或成员。

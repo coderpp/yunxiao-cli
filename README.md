@@ -69,37 +69,22 @@ npm version 0.1.1
 git push origin main v0.1.1
 ```
 
-## 技能同步
+## 研发管理技能
 
-当前仓库的技能位于 `.agents/skills`，可以同步到常用技能目录：
+五个业务技能只维护于本仓库 `.agents/skills/`，名称与触发规则见 [AGENTS.md](AGENTS.md)。默认使用云效官方 MCP；各技能先读取同一份 [基础说明](.agents/skills/manage-yunxiao-workitems/references/common.md)，继续分别负责工作项、统计、MR 处理、版本发布和失败流水线重试。
+
+CLI 原有命令仍保留，用于官方工具缺口、已有离线下载/脚本封装或用户明确指定的 CLI 任务，不再重复扩展 MCP 已覆盖的 API。实际路由见 [CLI 补充](.agents/skills/manage-yunxiao-workitems/references/cli-supplement.md)，验证证据见 [功能对照](.agents/skills/manage-yunxiao-workitems/references/official-mcp-coverage.md)。
+
+SYJC 使用五个技能的实体副本，不使用软链接。日常统一修改本仓库源文件，再复制更新：
 
 ```bash
 npm run skills:sync
+npm run skills:check
 ```
 
-同步目标：
+目标路径不同可用 `npm run skills:sync -- /path/to/syjc`，检查时同样传目标路径。脚本只处理这五个技能；不同内容在替换前备份到目标 Git 元数据目录的 `skills-copy-backup-*`，相同内容不重写。若 SYJC 副本有独立修改，应先比较并合并回源，再执行同步。
 
-- `~/pp-note/.agents/skills`
-- `~/pp-note/.claude/skills`
-- `~/.hermes/skills`
-
-如果希望技能文件修改后自动同步，启动 watcher：
-
-```bash
-npm run skills:watch
-```
-
-Watcher 会先同步一次，然后持续监听 `.agents/skills` 文件变化；同名技能会覆盖，目标目录里的其他技能不会被删除。
-
-如果希望后台常驻自动同步：
-
-```bash
-npm run skills:watch:start
-npm run skills:watch:status
-npm run skills:watch:stop
-```
-
-后台 watcher 的 PID 和日志保存在 `.git/skill-sync-watch.*`，不会提交到仓库。
+现有指向本源的软链接会转换为实体目录，不修改源文件。更新后 SYJC 可独立读取副本，换机仅使用技能不要求同时检出 CLI 仓库。无需后台 watcher；MR 代码评审仍由 SYJC 的 `review-branch-changes` 执行。
 
 ## 配置
 
