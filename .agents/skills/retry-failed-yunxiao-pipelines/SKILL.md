@@ -37,7 +37,7 @@ description: 使用云效官方 MCP 查询近期失败流水线、按流水线�
 3. 每个获授权的失败任务调用 `retry_pipeline_job_run`，参数为 `organizationId/pipelineId/pipelineRunId/jobId`。每个任务本次只提交一次。
 4. 再用 `get_pipeline_run` 回读状态。`RUNNING` 只表示已进入执行，不等于成功；失败要记录错误与 requestId。
 
-`rerun_pipeline_job_run` 是部署任务重跑，不等同于失败任务重试。`create_pipeline_run`、取消、跳过和人工审批也不在重试授权内。用户另行明确要求取消整次运行时，按 [CLI 补充](../manage-yunxiao-workitems/references/cli-supplement.md) 操作；不能以停止单个 job 代替取消整个 run。
+`rerun_pipeline_job_run` 是部署任务重跑，不等同于失败任务重试。`create_pipeline_run`、取消、跳过和人工审批也不在重试授权内。用户另行明确要求取消整次运行时，检查当前官方 MCP 是否提供对应工具；缺失时说明限制并停止取消操作，不改用 CLI，不能以停止单个 job 代替取消整个 run。
 
 重试超时或返回结果未知时，先查运行状态，不自动重复写入。没有失败运行或没有失败任务时报告无需重试并结束；名称歧义、权限错误、参数或对象错误时停止相关操作。明确重试失败时停止后续写操作并汇报。
 

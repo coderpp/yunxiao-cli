@@ -71,9 +71,9 @@ git push origin main v0.1.1
 
 ## 研发管理技能
 
-五个业务技能只维护于本仓库 `.agents/skills/`，名称与触发规则见 [AGENTS.md](AGENTS.md)。默认使用云效官方 MCP；各技能先读取同一份 [基础说明](.agents/skills/manage-yunxiao-workitems/references/common.md)，继续分别负责工作项、统计、MR 处理、版本发布和失败流水线重试。
+五个业务技能只维护于本仓库 `.agents/skills/`，名称与触发规则见 [AGENTS.md](AGENTS.md)。只使用云效官方 MCP；各技能先读取同一份 [基础说明](.agents/skills/manage-yunxiao-workitems/references/common.md)，继续分别负责工作项、统计、MR 处理、版本发布和失败流水线重试。
 
-CLI 原有命令仍保留，用于官方工具缺口、已有离线下载/脚本封装或用户明确指定的 CLI 任务，不再重复扩展 MCP 已覆盖的 API。实际路由见 [CLI 补充](.agents/skills/manage-yunxiao-workitems/references/cli-supplement.md)，验证证据见 [功能对照](.agents/skills/manage-yunxiao-workitems/references/official-mcp-coverage.md)。
+云效技能不再调用 CLI；官方 MCP 缺少对应工具、参数或权限时说明限制并停止依赖操作。正文、图片和附件由 MCP 获取，离线包使用本地文件工具整理。CLI 程序保留但不作为技能执行入口，验证证据见 [功能对照](.agents/skills/manage-yunxiao-workitems/references/official-mcp-coverage.md)。
 
 SYJC 使用五个技能的实体副本，不使用软链接。日常统一修改本仓库源文件，再复制更新：
 

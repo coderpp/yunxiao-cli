@@ -1,6 +1,6 @@
-# 官方 MCP 能力对照与 CLI 补充
+# 官方 MCP 能力与验证范围
 
-核对日期：2026-11-04。依据为本机会话实际注册的 `mcp__yunxiao__*` 参数 schema、只读调用，以及现有 `@coderpp/yunxiao-cli` 源码和技能。工具会随服务版本和 toolsets 改变，执行时重新发现目标工具；不能将本表视为永久缺口清单。
+核对日期：2026-11-04。依据为本机会话实际注册的 `mcp__yunxiao__*` 参数 schema、只读调用，以及现有 `@coderpp/yunxiao-cli` 源码和技能。2026-11-07 起技能只使用官方 MCP，不再提供 CLI 补充。工具会随服务版本和 toolsets 改变，执行时重新发现目标工具；不能将本表视为永久缺口清单。
 
 后续完整 CLI 命令对比补充了关闭 MR、取消整次流水线两项；这两项只核对官方工具注册与本地 CLI 定义，未执行写入。来源：[Codeup 工具](https://github.com/aliyun/alibabacloud-devops-mcp-server/blob/master/tool-registry/code-management.ts)、[Flow 工具](https://github.com/aliyun/alibabacloud-devops-mcp-server/blob/master/tool-registry/pipeline.ts)。
 
@@ -12,24 +12,24 @@
 |---|---|---|
 | 工作项列表、负责人/创建人/时间筛选 | `search_workitems` | 可替换；逐项目分页，状态按既有口径分类 |
 | 详情、评论、动态、附件列表 | `get_work_item`、`list_work_item_comments`、`list_workitem_activities`、`list_workitem_attachments` | 有对应工具；评论需分页 |
-| 正文/评论图片与普通附件下载 | `get_workitem_file` | 能取得临时 URL；普通阅读用 MCP；离线包可复用现有 CLI 下载、去重和正文改写封装 |
+| 正文/评论图片与普通附件下载 | `get_workitem_file` | 能取得临时 URL；下载并实际打开图片、读取附件；离线包用本地文件工具整理 MCP 数据 |
 | 负责人、参与人更新 | `update_work_item.updateWorkItemFields` | schema 覆盖；真实写入未测试 |
 | 自定义日期字段 | `get_work_item_type_field_config` + `customFieldValues` | 条件覆盖，必须确认实际字段和值格式；未验证真实日期写入 |
-| 顶层系统 `dueDate` | 当前 `updateWorkItemFields` 无该参数 | 未覆盖，保留 CLI；不能擅自改为自定义字段 |
+| 顶层系统 `dueDate` | 当前 `updateWorkItemFields` 无该参数 | 未覆盖时说明限制并停止该字段更新；不能擅自改为自定义字段 |
 | 普通评论、从文件读取评论内容 | `create_work_item_comment` | 可替换；文件内容由本地读取后传 `content` |
-| 对指定评论回复 | 当前 `create_work_item_comment` 无 `parentId` | 未覆盖，保留 CLI 定向回复 |
+| 对指定评论回复 | 当前 `create_work_item_comment` 无 `parentId` | 未覆盖时说明限制；不得降级为新评论 |
 | 组织成员查询 | `search_organization_members`、`list_organization_members` | 有对应工具，不等于项目成员 |
-| Projex 项目成员列表/增删 | 无项目成员对应工具 | 未覆盖，保留 CLI；Flow 的 `resource_member` 工具不可替代 |
+| Projex 项目成员列表/增删 | 无项目成员对应工具 | 未覆盖时说明限制并停止成员操作；Flow 的 `resource_member` 工具不可替代 |
 | MR 列表、详情、补丁集 | `list_change_requests`、`get_change_request`、`list_change_request_patch_sets` | 可替换；继续保留 Git 精确快照评审 |
-| 关闭 MR | 当前未提供 Codeup 关闭 MR 工具 | 保留 `mr close`；AppStack 关闭变更工具不能替代 |
+| 关闭 MR | 当前未提供 Codeup 关闭 MR 工具 | 未覆盖时说明限制并停止关闭；AppStack 关闭变更工具不能替代 |
 | MR 创建、批准、合并 | `create_change_request`、`review_change_request`、`merge_change_request` | schema 覆盖；查重、防竞态、恢复与回读由技能组织 |
 | 版本发布一键流程 | 上述多个 MR 工具 | 可组合实现；保持版本顺序、分支映射与保留 master |
 | 失败运行、任务与日志 | `list_pipelines`、`list_pipeline_runs`、`get_pipeline_run`、日志工具 | 可替换；需修正分页终止判断 |
-| 取消整次流水线运行 | 当前工具提供停止单个 job，无直接取消整个 run 工具 | 保留 `pipeline cancel`，不能当作重试的附带操作 |
+| 取消整次流水线运行 | 当前工具提供停止单个 job，无直接取消整个 run 工具 | 未覆盖时说明限制并停止取消；不能当作重试的附带操作 |
 | 失败任务重试 | `retry_pipeline_job_run` | schema 覆盖；真实重试未测试 |
 | 人员月报/周报、历史运行导出 | MCP 查询 + 本地汇总/制表 | 可组合实现；全量分页、状态口径和文件交付由技能负责 |
 
-结论：可以将日常读取、MR 和流水线操作默认切换到官方 MCP；当前还不能删除所有 CLI 补充。MCP 提供 API 操作，不自动继承 CLI 的项目范围限制、状态分类、批处理顺序和未知写入恢复语义。
+结论：云效技能只使用官方 MCP。缺少工具或参数时说明限制并停止依赖操作，不用 CLI 或自行调用云效 HTTP API 补齐。项目范围、状态分类、批处理顺序和未知写入恢复仍由技能维护。
 
 ## 只读验证记录
 
@@ -43,4 +43,4 @@
 
 ## 执行入口
 
-公共工具与分页规则见 [公共说明](common.md)；上述缺口、已有文件封装和授权后的命令操作见 [CLI 补充](cli-supplement.md)。本文只保存能力对照与验证证据，不另维护一套执行规则。
+公共工具、分页、文件处理与能力缺失处理规则见 [公共说明](common.md)。本文只保存能力对照与验证证据，不另维护一套执行规则。

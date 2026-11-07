@@ -1,18 +1,18 @@
 # 云效技能公共说明
 
-使用任一云效业务技能前读取本文件；同一任务只需读取一次。业务技能决定查询口径、目标范围和写入授权；本文件统一工具、认证、分页与结果处理。CLI 的参数只在实际需要补充能力时读取 [CLI 补充](cli-supplement.md)，能力依据见 [功能对照](official-mcp-coverage.md)。
+使用任一云效业务技能前读取本文件；同一任务只需读取一次。业务技能决定查询口径、目标范围和写入授权；本文件统一工具、认证、分页与结果处理。能力与已验证范围见 [功能对照](official-mcp-coverage.md)。
 
 ## 工具选择与认证
 
-- 默认使用云效官方 `alibabacloud-devops-mcp-server`。当前工具前缀为 `mcp__yunxiao__`，业务技能省略前缀；按当前客户端实际注册名称和 schema 调用，不能把 CLI 参数直接传入 MCP。
-- MCP 使用客户端已有认证，不加载 CLI Token，不因日常调用改写客户端配置。当前工具未暴露时先说明缺失；不要因为权限不足切换凭证或用 CLI 绕过。
+- 只使用云效官方 `alibabacloud-devops-mcp-server`。当前工具前缀为 `mcp__yunxiao__`，业务技能省略前缀；按当前客户端实际注册名称和 schema 调用。
+- MCP 使用客户端已有认证，不加载本地 Token，不因日常调用改写客户端配置。当前工具未暴露时先说明缺失；不切换凭证、CLI 或自行调用云效 HTTP API 绕过。
 - `organizationId` 优先使用用户明确指定值；否则读取 `get_current_organization_info` 的 `lastOrganization`。与已有任务目标不一致时先核实，不跨组织。当前用户 ID 用 `get_current_user`。
 - 姓名用 `search_organization_members` 或分页 `list_organization_members` 解析为用户 ID；同名或未匹配时消歧。组织成员不等于项目成员。
-- 有官方对应能力的新增需求优先使用 MCP，不为功能对齐继续扩展 CLI。CLI 原有命令保留，适用于已确认缺口、已有文件/脚本封装或用户明确指定的命令行任务。
+- 缺少对应工具或参数时，说明当前能力限制，停止依赖该能力的操作；继续可独立完成的已授权部分。不提供 CLI 补充或回退路径。正文、图片、附件与离线内容包均通过 MCP 取得数据和下载地址，再用本地文件工具读取、整理；文件下载不属于另建云效 API 调用入口。
 
 ## 范围配置与对象标识
 
-仅为读取非秘密的项目范围或类别配置，依次检查 `~/repos/syjc/.env`、`~/pp-note/.env`、`~/.env`、`~/.zshrc`，采用第一个存在的配置文件。不要输出整个文件或复制凭证；MCP 的认证独立于这些 CLI 配置。
+仅为读取非秘密的项目范围或类别配置，依次检查 `~/repos/syjc/.env`、`~/pp-note/.env`、`~/.env`、`~/.zshrc`，采用第一个存在的配置文件。不要输出整个文件或复制凭证；MCP 的认证独立于这些范围配置。
 
 - 工作项管理以 `YUNXIAO_PROJECT_IDS` 限定项目；统计技能另外合并笔记库 `_系统/技能数据/云效关注项目.md`，按该技能执行。范围缺失或用户目标超出范围时先确认，不能默认扫描全组织。
 - 链接里的项目 ID 与详情 `space.id` 必须一致。逐项目使用 `spaceId`，不能拼接多个项目 ID。
@@ -39,7 +39,7 @@
 |---|---|
 | 当前用户 | `assignedTo="self"`；需要明确用户 ID 时用 `get_current_user` |
 | 指定负责人 / 创建人 | `assignedTo` / `creator`，多个用户 ID 逗号分隔 |
-| 类型 | `category` 是必传字符串；沿用 `YUNXIAO_WORKITEM_CATEGORIES`，未配置时与旧 CLI 一致为 `Req,Task,Bug`，不擅自缩减为单一类型 |
+| 类型 | `category` 是必传字符串；沿用 `YUNXIAO_WORKITEM_CATEGORIES`，未配置时为 `Req,Task,Bug`，不擅自缩减为单一类型 |
 | 明确要求所有类型 | 先用 `list_work_item_types` 核对项目类型及类别，再覆盖查询；枚举受限时说明已查类别，不能宣称全类型 |
 | 标题 / 正文关键词 | `subject` / `subjectDescription` |
 | 创建日期 | `createdAfter` / `createdBefore` |
@@ -52,7 +52,7 @@
 
 状态技术映射（是否合并 todo 与 doing 由业务技能决定）：
 
-- 旧 CLI 按 `status.nameEn/name/displayName` 过滤：todo 对应 `TODO/待处理/待办`；doing 对应 `DOING/IN_PROGRESS/PROCESSING/进行中/处理中`；done 对应 `DONE/COMPLETED/CLOSED/已完成/完成/已关闭`。迁移时保留这一口径，不把所有非 done 状态自动算作 todo。
+- 按 `status.nameEn/name/displayName` 分类：todo 对应 `TODO/待处理/待办`；doing 对应 `DOING/IN_PROGRESS/PROCESSING/进行中/处理中`；done 对应 `DONE/COMPLETED/CLOSED/已完成/完成/已关闭`。保持这一口径，不把所有非 done 状态自动算作 todo。
 - MCP 的 `status` 是状态 ID，`statusStage` 是阶段 ID，不能填 `todo/doing/done`。已有可靠工作流映射时可服务端过滤；否则读取完整结果后按上述口径本地过滤。
 - `get_work_item_workflow` 可核对项目实际状态；权限不足时不得猜测固定状态或阶段 ID。未知状态保留并说明分类缺口；需要业务重新归类时由用户确定。
 
@@ -61,7 +61,7 @@
 - 按业务技能识别查看、评审、修改、发布、重试等意图；仅查看和评审不授权远端批准、评论或合并。既有明确授权足够时直接执行，不重复索要确认。
 - 工具可调用不等于当前账号有权限。403 需说明具体受限接口，继续独立的已授权只读部分；不要猜测缺失字段或扩大范围。
 - 只更新用户要求的字段。评论、MR 描述等长文本用结构化字符串；文件输入先读取原文。
-- 写入超时或结果未知时，先回读对象状态再决定后续步骤；不能在 MCP 与 CLI 之间重发同一写入。创建操作查重，阶段失败保留已完成状态。
+- 写入超时或结果未知时，先回读对象状态再决定后续步骤；不能盲目重发同一写入。创建操作查重，阶段失败保留已完成状态。
 - 回读后报告真实结果。MR 已合并、流水线已启动、部署已成功、生产效果已验证是不同状态。只核对 schema 不能声称真实写入已验证。
 - Token、连接串和临时签名下载 URL 不进入说明、报告或持久日志；对象存储下载不携带云效 PAT。
 
